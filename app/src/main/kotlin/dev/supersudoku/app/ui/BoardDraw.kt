@@ -464,13 +464,16 @@ fun DrawScope.drawDiagonals(grid: GridDef, toPx: (Pos) -> Offset, cellPx: Float)
     drawLine(BoardColors.diagonal, a + Offset(s, 0f), a + Offset(0f, s), w)
 }
 
-/** Corridor labels (overview only). */
+/** Corridor labels (overview only): centered compass-style captions. */
 fun DrawScope.drawLabels(
     labels: List<dev.supersudoku.core.BoardLabel>,
     toPx: (Pos) -> Offset,
     cellPx: Float,
     measurer: TextMeasurer,
 ) {
+    // Bounding boxes of already-drawn labels (board px); a label whose box
+    // would intersect one is skipped so words can never print over each other.
+    val drawn = mutableListOf<Pair<Offset, androidx.compose.ui.geometry.Size>>()
     for (l in labels) {
         val layout = measurer.measure(
             AnnotatedString(l.text),
@@ -480,7 +483,20 @@ fun DrawScope.drawLabels(
                 fontWeight = FontWeight.Bold,
             ),
         )
-        val tl = toPx(Pos(l.x, l.y))
-        drawText(layout, color = BoardColors.dim, topLeft = tl + Offset(cellPx * 0.1f, cellPx * 0.15f))
+        val origin = toPx(Pos(l.x, l.y))
+        val w = layout.size.width.toFloat()
+        val h = layout.size.height.toFloat()
+        // Center on the cell; clamp inside the board so edge labels stay visible.
+        val cx = (origin.x + (cellPx - w) / 2f).coerceIn(0f, (size.width - w).coerceAtLeast(0f))
+        val cy = (origin.y + (cellPx - h) / 2f).coerceIn(0f, (size.height - h).coerceAtLeast(0f))
+        val box = Offset(cx, cy) to androidx.compose.ui.geometry.Size(w, h)
+        if (drawn.any { (o, s) ->
+                cx < o.x + s.width && o.x < cx + w && cy < o.y + s.height && o.y < cy + h
+            }
+        ) {
+            continue
+        }
+        drawn.add(box)
+        drawText(layout, color = BoardColors.dim, topLeft = Offset(cx, cy))
     }
 }

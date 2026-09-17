@@ -104,6 +104,8 @@ fun SuperBoardContent(
     val doubleTap by settings.focusOnDoubleTap.collectAsState(initial = true)
     var popupFor by remember { mutableStateOf<Pos?>(null) }
     val focus = rememberBoardFocus()
+    // Ticks playSeconds once per second and flushes the save on exit.
+    rememberGameClock(vm)
     // Dialogs steal keyboard focus; hand it back on dismiss.
     LaunchedEffect(popupFor) {
         if (popupFor == null) runCatching { focus.requestFocus() }

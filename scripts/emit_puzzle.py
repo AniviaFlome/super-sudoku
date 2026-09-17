@@ -220,10 +220,20 @@ def main():
     check(diag_pts == main_d | anti_d, "X diagonals are the grid corner-to-corner lines")
 
     # ---------- labels ----------
+    # Compass-style captions: the transcription places a few label words in
+    # horizontally adjacent cells ("Sudoku"+"X", "White"+"Kropki"), and the
+    # renderer draws each word wider than one cell, so they print over each
+    # other. Keep every word, but stack those pairs vertically in free
+    # corridor cells instead.
+    LABEL_MOVES = {
+        ("X", 5, 24): (4, 25),
+        ("Kropki", 31, 10): (30, 11),
+    }
     labels = []
     for text, pts in raw["labels"].items():
         for x, y in pts:
-            labels.append({"text": text, "x": x, "y": y})
+            nx, ny = LABEL_MOVES.get((text, x, y), (x, y))
+            labels.append({"text": text, "x": nx, "y": ny})
 
     # ---------- assemble ----------
     grids = []

@@ -78,10 +78,16 @@ class PenpaGoldenTest {
                 "groups @(${imp.x},${imp.y})",
             )
         }
-        // labels identical (same transcription source)
+        // bundled labels are the transcription source plus the compass-caption
+        // adjustments from scripts/emit_puzzle.py (LABEL_MOVES); keep in sync.
+        val moves = mapOf(
+            Triple("X", 5, 24) to Triple("X", 4, 25),
+            Triple("Kropki", 31, 10) to Triple("Kropki", 30, 11),
+        )
         assertEquals(
             bundled.labels.map { Triple(it.text, it.x, it.y) }.toSet(),
-            imported.labels.map { Triple(it.text, it.x, it.y) }.toSet(),
+            imported.labels.map { Triple(it.text, it.x, it.y) }
+                .map { moves[it] ?: it }.toSet(),
         )
     }
 

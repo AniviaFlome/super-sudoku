@@ -21,6 +21,7 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.MenuDefaults
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -162,7 +163,7 @@ fun SettingsScreen(settings: SettingsRepo, themes: ThemeRepo, onBack: () -> Unit
             Spacer(Modifier.height(8.dp))
             Text(
                 // Keep in sync with app/build.gradle.kts versionName.
-                "v1.0.2",
+                "v1.0.3",
                 style = MaterialTheme.typography.bodySmall,
                 color = BoardColors.dim,
             )
@@ -222,12 +223,16 @@ private fun <T> SettingChoice(
             Text(currentLabel, style = MaterialTheme.typography.bodySmall, color = BoardColors.entry)
         }
         Icon(Icons.Filled.ArrowDropDown, "Change", tint = BoardColors.dim)
-        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false },
+            containerColor = BoardColors.bg,
+        ) {
             for (o in options) {
                 DropdownMenuItem(
                     text = {
                         Column {
-                            Text(optionLabel(o))
+                            Text(optionLabel(o), color = BoardColors.given)
                             val sub = optionSubtitle?.invoke(o)
                             if (sub != null) {
                                 Text(sub, style = MaterialTheme.typography.bodySmall, color = BoardColors.dim)
@@ -238,6 +243,10 @@ private fun <T> SettingChoice(
                         { Text("✓", color = BoardColors.entry) }
                     } else null,
                     onClick = { expanded = false; onSelect(o) },
+                    colors = MenuDefaults.itemColors(
+                        textColor = BoardColors.given,
+                        trailingIconColor = BoardColors.entry,
+                    ),
                 )
             }
         }
