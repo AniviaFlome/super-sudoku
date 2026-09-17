@@ -79,9 +79,9 @@ class SettingsRepo(private val context: Context) {
 
     private val doubleTapKey = booleanPreferencesKey("focus_on_double_tap")
 
-    /** Double-tap a grid to focus it. Default off. */
+    /** Double-tap a grid to focus it. Default on. */
     val focusOnDoubleTap: Flow<Boolean> =
-        context.settingsStore.data.map { it[doubleTapKey] ?: false }
+        context.settingsStore.data.map { it[doubleTapKey] ?: true }
 
     suspend fun setFocusOnDoubleTap(v: Boolean) {
         context.settingsStore.edit { it[doubleTapKey] = v }

@@ -49,7 +49,7 @@ fun SettingsScreen(settings: SettingsRepo, themes: ThemeRepo, onBack: () -> Unit
     val mistake by settings.mistakeMode.collectAsState(initial = MistakeMode.CONFLICTS)
     val sameDigit by settings.sameDigitHighlight.collectAsState(initial = true)
     val bidir by settings.bidirectionalSelection.collectAsState(initial = true)
-    val doubleTap by settings.focusOnDoubleTap.collectAsState(initial = false)
+    val doubleTap by settings.focusOnDoubleTap.collectAsState(initial = true)
     val peerClear by settings.autoClearPeerNotes.collectAsState(initial = true)
     val dimDone by settings.dimCompletedDigits.collectAsState(initial = true)
     val orientation by settings.orientation.collectAsState(initial = SettingsRepo.Orientation.PORTRAIT)

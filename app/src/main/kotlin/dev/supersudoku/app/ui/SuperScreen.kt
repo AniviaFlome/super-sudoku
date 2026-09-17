@@ -95,7 +95,7 @@ fun SuperBoardContent(
     val bidir by settings.bidirectionalSelection.collectAsState(initial = true)
     val clearPeers by settings.autoClearPeerNotes.collectAsState(initial = true)
     val dimDone by settings.dimCompletedDigits.collectAsState(initial = true)
-    val doubleTap by settings.focusOnDoubleTap.collectAsState(initial = false)
+    val doubleTap by settings.focusOnDoubleTap.collectAsState(initial = true)
     var popupFor by remember { mutableStateOf<Pos?>(null) }
     val focus = rememberBoardFocus()
     // Dialogs steal keyboard focus; hand it back on dismiss.
@@ -379,7 +379,7 @@ private fun OverviewBoard(
                                 (up.position - lastTapAt).getDistance() < 48f
                             lastTapMs = now
                             lastTapAt = up.position
-                            if (!quickSecond || !focusOnDoubleTap) continue
+                            if (!quickSecond || !focusOnDoubleTap || tapMode == TapMode.POPUP) continue
                             if (bx in 0 until vm.boardCols && by in 0 until vm.boardRows) {
                                 val gs = puzzle.gridsAt(Pos(bx, by))
                                 if (gs.size == 1) {

@@ -17,6 +17,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -129,6 +130,7 @@ fun ImportScreen(onBack: () -> Unit, onImported: (String) -> Unit) {
 
     Column(
         Modifier.fillMaxSize().background(BoardColors.bg).padding(20.dp)
+            .imePadding()
             .verticalScroll(rememberScrollState()),
     ) {
         ScreenHeader(title = "Import puzzle", onBack = onBack)

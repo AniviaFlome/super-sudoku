@@ -2,8 +2,17 @@ package dev.supersudoku.app
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -11,6 +20,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.luminance
 import androidx.lifecycle.viewmodel.compose.viewModel
 import dev.supersudoku.app.state.AppTheme
 import dev.supersudoku.app.state.CustomStore
@@ -60,6 +71,30 @@ class MainActivity : ComponentActivity() {
             }
             // Push the palette into the board renderer before first draw.
             BoardColors.applyPalette(palette)
+            // Target SDK 36 enforces edge-to-edge: draw behind the system bars
+            // ourselves and keep icon contrast matched to the active theme
+            // (app themes don't follow system dark mode).
+            val useDarkIcons = palette.material.background.luminance() > 0.5f
+            SideEffect {
+                enableEdgeToEdge(
+                    statusBarStyle = if (useDarkIcons) {
+                        SystemBarStyle.light(
+                            android.graphics.Color.TRANSPARENT,
+                            android.graphics.Color.TRANSPARENT,
+                        )
+                    } else {
+                        SystemBarStyle.dark(android.graphics.Color.TRANSPARENT)
+                    },
+                    navigationBarStyle = if (useDarkIcons) {
+                        SystemBarStyle.light(
+                            android.graphics.Color.TRANSPARENT,
+                            android.graphics.Color.TRANSPARENT,
+                        )
+                    } else {
+                        SystemBarStyle.dark(android.graphics.Color.TRANSPARENT)
+                    },
+                )
+            }
             MaterialTheme(colorScheme = palette.material) {
                 var screenTag by rememberSaveable { mutableStateOf("home") }
                 var practiceEntry by rememberSaveable { mutableStateOf("") }
@@ -112,7 +147,15 @@ class MainActivity : ComponentActivity() {
                         }
                     }
                 }
-                when (screenTag) {
+                // Keep every screen inside the safe-drawing area so the
+                // status bar, navigation bar, and display cutout never cover
+                // (or steal touches from) top bars and the bottom keypad.
+                Box(
+                    Modifier.fillMaxSize()
+                        .background(BoardColors.bg)
+                        .windowInsetsPadding(WindowInsets.safeDrawing)
+                ) {
+                    when (screenTag) {
                     "home" -> HomeScreen(
                         currentMapId = currentMapId,
                         onSuperHome = { screenTag = "maps" },
@@ -296,6 +339,7 @@ class MainActivity : ComponentActivity() {
                         },
                     )
                     else -> SettingsScreen(settings, themes, onBack = { screenTag = settingsReturn })
+                    }
                 }
             }
         }
