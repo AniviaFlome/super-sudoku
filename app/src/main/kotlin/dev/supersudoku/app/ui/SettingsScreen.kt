@@ -162,7 +162,7 @@ fun SettingsScreen(settings: SettingsRepo, themes: ThemeRepo, onBack: () -> Unit
             Spacer(Modifier.height(8.dp))
             Text(
                 // Keep in sync with app/build.gradle.kts versionName.
-                "v1.0.1",
+                "v1.0.2",
                 style = MaterialTheme.typography.bodySmall,
                 color = BoardColors.dim,
             )
