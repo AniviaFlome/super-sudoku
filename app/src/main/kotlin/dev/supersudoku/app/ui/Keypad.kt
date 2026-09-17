@@ -7,6 +7,11 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -78,7 +83,9 @@ fun KeypadPanel(
 ) {
     if (vertical) {
         Column(
-            Modifier.background(BoardColors.bg).padding(horizontal = 8.dp, vertical = 6.dp),
+            Modifier.background(BoardColors.bg)
+                .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom))
+                .padding(horizontal = 8.dp, vertical = 6.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             DigitGrid(
@@ -107,7 +114,9 @@ fun KeypadPanel(
         return
     }
     Row(
-        Modifier.fillMaxWidth().background(BoardColors.bg).padding(horizontal = 8.dp, vertical = 6.dp),
+        Modifier.fillMaxWidth().background(BoardColors.bg)
+            .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom))
+            .padding(horizontal = 8.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(Modifier.weight(1f)) {

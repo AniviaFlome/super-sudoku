@@ -3,6 +3,7 @@ package dev.supersudoku.app
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.background
@@ -22,6 +23,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.graphics.toArgb
 import androidx.lifecycle.viewmodel.compose.viewModel
 import dev.supersudoku.app.state.AppTheme
 import dev.supersudoku.app.state.CustomStore
@@ -73,25 +75,22 @@ class MainActivity : ComponentActivity() {
             BoardColors.applyPalette(palette)
             // Target SDK 36 enforces edge-to-edge: draw behind the system bars
             // ourselves and keep icon contrast matched to the active theme
-            // (app themes don't follow system dark mode).
+            // (app themes don't follow system dark mode). Bars are filled
+            // with the board background so the nav bar never shows the board
+            // through a transparent scrim.
             val useDarkIcons = palette.material.background.luminance() > 0.5f
+            val barColor = palette.bg.toArgb()
             SideEffect {
                 enableEdgeToEdge(
                     statusBarStyle = if (useDarkIcons) {
-                        SystemBarStyle.light(
-                            android.graphics.Color.TRANSPARENT,
-                            android.graphics.Color.TRANSPARENT,
-                        )
+                        SystemBarStyle.light(barColor, barColor)
                     } else {
-                        SystemBarStyle.dark(android.graphics.Color.TRANSPARENT)
+                        SystemBarStyle.dark(barColor)
                     },
                     navigationBarStyle = if (useDarkIcons) {
-                        SystemBarStyle.light(
-                            android.graphics.Color.TRANSPARENT,
-                            android.graphics.Color.TRANSPARENT,
-                        )
+                        SystemBarStyle.light(barColor, barColor)
                     } else {
-                        SystemBarStyle.dark(android.graphics.Color.TRANSPARENT)
+                        SystemBarStyle.dark(barColor)
                     },
                 )
             }
@@ -150,10 +149,40 @@ class MainActivity : ComponentActivity() {
                 // Keep every screen inside the safe-drawing area so the
                 // status bar, navigation bar, and display cutout never cover
                 // (or steal touches from) top bars and the bottom keypad.
+                // Game screens handle their own top/bottom insets so the
+                // keypad background extends into the nav area (no gap) and
+                // the timer bar background extends into the status area.
+                fun navigateBack() {
+                    when (screenTag) {
+                        "variants" -> screenTag = "home"
+                        "variantgames" -> screenTag = "variants"
+                        "normal" -> screenTag = "home"
+                        "super" -> screenTag = "maps"
+                        "standalone" -> screenTag = standaloneReturn
+                        "maps" -> screenTag = "home"
+                        "custom" -> screenTag = customReturn
+                        "practicePlay" -> screenTag = "normal"
+                        "rules" -> screenTag = "home"
+                        "import" -> screenTag = "home"
+                        "settings" -> screenTag = settingsReturn
+                        else -> {}
+                    }
+                }
+                // System back mirrors the on-screen back arrows instead of
+                // finishing the activity. Super focus-unfocus is consumed by
+                // an inner BackHandler before this outer one runs.
+                BackHandler(enabled = screenTag != "home") { navigateBack() }
+                val isGameScreen = screenTag == "super" ||
+                    screenTag == "standalone" ||
+                    screenTag == "custom" ||
+                    screenTag == "practicePlay"
                 Box(
                     Modifier.fillMaxSize()
                         .background(BoardColors.bg)
-                        .windowInsetsPadding(WindowInsets.safeDrawing)
+                        .then(
+                            if (isGameScreen) Modifier
+                            else Modifier.windowInsetsPadding(WindowInsets.safeDrawing)
+                        )
                 ) {
                     when (screenTag) {
                     "home" -> HomeScreen(

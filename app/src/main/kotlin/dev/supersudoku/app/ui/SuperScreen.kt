@@ -1,5 +1,6 @@
 package dev.supersudoku.app.ui
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.awaitFirstDown
@@ -11,13 +12,18 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -102,7 +108,11 @@ fun SuperBoardContent(
     LaunchedEffect(popupFor) {
         if (popupFor == null) runCatching { focus.requestFocus() }
     }
-    BoxWithConstraints(        Modifier.fillMaxSize().background(BoardColors.bg)
+    // System back first unfocuses a focused grid before leaving the screen.
+    BackHandler(enabled = vm.focusGridId != null) { vm.focusGridId = null }
+    BoxWithConstraints(
+        Modifier.fillMaxSize().background(BoardColors.bg)
+            .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal))
             .boardKeys(vm, focus, tapMode, clearPeers)
     ) {
         val wide = maxWidth > maxHeight && (maxWidth > 600.dp || maxHeight < 500.dp)
@@ -116,10 +126,15 @@ fun SuperBoardContent(
             vm.boardVersion // subscribe
             val focusGrid = vm.focusGrid()
             if (wide && focusGrid != null) {
-                Row(Modifier.fillMaxSize()) {
+                Row(Modifier.fillMaxSize().background(BoardColors.bg)) {
                     Column(Modifier.weight(1f).fillMaxHeight()) {
                         SuperTopBar(vm, onBack, onOpenSettings)
-                        Box(Modifier.weight(1f).fillMaxWidth()) {
+                        Box(
+                            Modifier.weight(1f).fillMaxWidth().background(BoardColors.bg)
+                                .windowInsetsPadding(
+                                    WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom)
+                                )
+                        ) {
                             FocusBoard(vm, p, focusGrid, sameDigitOn, mistakeMode, tapMode, bidir, clearPeers) { popupFor = it }
                         }
                     }
@@ -186,7 +201,9 @@ private fun SuperTopBar(
     onOpenSettings: () -> Unit,
 ) {
     Row(
-        Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 2.dp),
+        Modifier.fillMaxWidth().background(BoardColors.bg)
+            .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top))
+            .padding(horizontal = 4.dp, vertical = 2.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         IconButton(onClick = {

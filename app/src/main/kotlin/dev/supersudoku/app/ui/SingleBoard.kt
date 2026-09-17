@@ -8,10 +8,15 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -77,10 +82,13 @@ fun SingleBoardScreen(
     rememberGameClock(vm)
     Column(
         Modifier.fillMaxSize().background(BoardColors.bg)
+            .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal))
             .boardKeys(vm, focus, tapMode, clearPeers)
     ) {
         Row(
-            Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 2.dp),
+            Modifier.fillMaxWidth().background(BoardColors.bg)
+                .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top))
+                .padding(horizontal = 4.dp, vertical = 2.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             IconButton(onClick = onBack) {
@@ -119,8 +127,13 @@ fun SingleBoardScreen(
                     CircularProgressIndicator()
                 }
             } else if (wide) {
-                Row(Modifier.fillMaxSize()) {
-                    Box(Modifier.weight(1f).fillMaxHeight()) {
+                Row(Modifier.fillMaxSize().background(BoardColors.bg)) {
+                    Box(
+                        Modifier.weight(1f).fillMaxHeight().background(BoardColors.bg)
+                            .windowInsetsPadding(
+                                WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom)
+                            )
+                    ) {
                         SingleBoard(vm, sameDigitOn, mistakeMode, tapMode, bidir) { popupFor = it }
                     }
                     Column(
