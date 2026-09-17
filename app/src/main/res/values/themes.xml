@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Note: androidx.compose.material3 1.3+ ships no XML app themes;
+         Compose applies MaterialTheme in code. This parent only styles
+         the window behind the Compose content. -->
+    <style name="Theme.SuperSudoku" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/ic_launcher_background</item>
+        <item name="android:statusBarColor">@color/ic_launcher_background</item>
+        <item name="android:navigationBarColor">@color/ic_launcher_background</item>
+    </style>
+</resources>

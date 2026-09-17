@@ -1,0 +1,13 @@
+__pycache__
+.gradle/
+.gradle-home/
+.kotlin/
+build/
+**/build/
+local.properties
+*.iml
+.DS_Store
+*.jks
+*.keystore
+release.keystore
+google-services.json

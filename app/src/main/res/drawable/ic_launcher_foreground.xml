@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- 3x3 sudoku-box glyph -->
+    <path
+        android:fillColor="#E8EAED"
+        android:pathData="M30,30h12v12h-12zM48,30h12v12h-12zM66,30h12v12h-12zM30,48h12v12h-12zM48,48h12v12h-12zM66,48h12v12h-12zM30,66h12v12h-12zM48,66h12v12h-12zM66,66h12v12h-12z"
+        android:strokeWidth="4"
+        android:strokeColor="#E8EAED" />
+</vector>
