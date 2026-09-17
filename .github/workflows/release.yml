@@ -32,22 +32,17 @@ jobs:
       - name: Core unit tests
         run: ./gradlew :core:test --no-daemon
 
-      - name: Unsigned release AAB + debug APK
-        run: ./gradlew :app:bundleRelease :app:assembleDebug --no-daemon
+      - name: Debug APK
+        run: ./gradlew :app:assembleDebug --no-daemon
 
-      - name: Rename artifacts
+      - name: Rename artifact
         run: |
           TAG="${GITHUB_REF_NAME}"
-          cp app/build/outputs/bundle/release/app-release.aab "super-sudoku-${TAG}.aab"
           cp app/build/outputs/apk/debug/app-debug.apk "super-sudoku-${TAG}.apk"
-          sha256sum "super-sudoku-${TAG}.aab" "super-sudoku-${TAG}.apk" > checksums.txt
-          cat checksums.txt
 
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            super-sudoku-*.aab
             super-sudoku-*.apk
-            checksums.txt
           generate_release_notes: true
