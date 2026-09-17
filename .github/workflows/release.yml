@@ -40,17 +40,24 @@ jobs:
           TAG="${GITHUB_REF_NAME}"
           cp app/build/outputs/apk/debug/app-debug.apk "super-sudoku-${TAG}.apk"
 
+      - name: Build release notes from CHANGELOG
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          awk -v ver="$VERSION" '
+            /^## / { if (found) exit; if ($0 ~ "^## " ver "([ -]|$)") found=1; next }
+            found { print }
+          ' CHANGELOG.md | sed '/./,$!d' > release_notes.md
+          if [ ! -s release_notes.md ]; then
+            echo "Super Sudoku $VERSION" > release_notes.md
+          fi
+          cat release_notes.md
+
       - name: Publish GitHub Release
-        # NOTE: explicit body, never generate_release_notes — the generated
-        # "Full Changelog" footer gets duplicated every time a tag is
+        # NOTE: explicit body file — never generate_release_notes, whose
+        # "Full Changelog" footer duplicates every time a tag is
         # force-pushed and the existing release is updated.
         uses: softprops/action-gh-release@v2
         with:
           files: |
             super-sudoku-*.apk
-          body: |
-            Super Sudoku ${{ github.ref_name }}
-
-            Sideload-friendly build signed with the debug key — install it
-            directly on your device. (Play Store builds are signed separately
-            with the private upload key.)
+          body_path: release_notes.md
