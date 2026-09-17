@@ -19,10 +19,14 @@ jobs:
           cache: gradle
 
       - name: Set up Android SDK
+        # NOTE: package names must be UNQUOTED here — the action splits the
+        # string naively and literal quotes break sdkmanager. Omitting
+        # `packages` is worse: it defaults to the obsolete `tools` package,
+        # which no longer exists in the repository.
         uses: android-actions/setup-android@v3
-
-      - name: Install SDK packages
-        run: sdkmanager "platform-tools" "platforms;android-36" "build-tools;36.0.0"
+        with:
+          packages: platform-tools platforms;android-36 build-tools;36.0.0
+          log-accepted-android-sdk-licenses: "false"
 
       - name: Core unit tests
         run: ./gradlew :core:test --no-daemon
