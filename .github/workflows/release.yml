@@ -41,8 +41,16 @@ jobs:
           cp app/build/outputs/apk/debug/app-debug.apk "super-sudoku-${TAG}.apk"
 
       - name: Publish GitHub Release
+        # NOTE: explicit body, never generate_release_notes — the generated
+        # "Full Changelog" footer gets duplicated every time a tag is
+        # force-pushed and the existing release is updated.
         uses: softprops/action-gh-release@v2
         with:
           files: |
             super-sudoku-*.apk
-          generate_release_notes: true
+          body: |
+            Super Sudoku ${{ github.ref_name }}
+
+            Sideload-friendly build signed with the debug key — install it
+            directly on your device. (Play Store builds are signed separately
+            with the private upload key.)
