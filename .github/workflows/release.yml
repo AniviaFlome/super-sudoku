@@ -23,36 +23,31 @@ jobs:
 
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
-        with:
-          packages: platform-tools "platforms;android-36" "build-tools;36.0.0"
 
-      - name: Restore upload keystore
-        env:
-          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
-        run: |
-          echo "$ANDROID_KEYSTORE_BASE64" | base64 --decode > release.keystore
+      - name: Install SDK packages
+        # NOTE: pass packages to sdkmanager directly — the action's
+        # `packages:` input keeps literal quotes and breaks ("platforms;android-36" not found).
+        run: sdkmanager "platform-tools" "platforms;android-36" "build-tools;36.0.0"
 
       - name: Core unit tests
         run: ./gradlew :core:test --no-daemon
 
-      - name: Signed release AAB + APK
-        env:
-          KEYSTORE_PATH: release.keystore
-          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
-          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
-          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
-        run: ./gradlew :app:bundleRelease :app:assembleRelease --no-daemon
+      - name: Unsigned release AAB + debug APK
+        run: ./gradlew :app:bundleRelease :app:assembleDebug --no-daemon
 
-      - name: Verify signatures
+      - name: Rename artifacts
         run: |
-          SDK="$ANDROID_HOME/build-tools/36.0.0"
-          "$SDK/apksigner" verify --print-certs app/build/outputs/apk/release/app-release.apk | head -3
-          jarsigner -verify app/build/outputs/bundle/release/app-release.aab | grep -i verified
+          TAG="${GITHUB_REF_NAME}"
+          cp app/build/outputs/bundle/release/app-release.aab "super-sudoku-${TAG}.aab"
+          cp app/build/outputs/apk/debug/app-debug.apk "super-sudoku-${TAG}.apk"
+          sha256sum "super-sudoku-${TAG}.aab" "super-sudoku-${TAG}.apk" > checksums.txt
+          cat checksums.txt
 
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            app/build/outputs/bundle/release/app-release.aab
-            app/build/outputs/apk/release/app-release.apk
+            super-sudoku-*.aab
+            super-sudoku-*.apk
+            checksums.txt
           generate_release_notes: true
