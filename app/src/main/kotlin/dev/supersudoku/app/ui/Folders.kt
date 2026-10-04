@@ -21,6 +21,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 
 /** Shared OpenSudoku-style folder row. */
@@ -33,9 +34,11 @@ fun FolderRow(
     titleColor: Color = BoardColors.given,
     /** 0..1 progress bar under the subtitle, or null for none. */
     progress: Float? = null,
+    testTag: String? = null,
 ) {
     Row(
         Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))
+            .then(if (testTag != null) Modifier.testTag(testTag) else Modifier)
             .clickable(onClick = onClick).padding(horizontal = 12.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {

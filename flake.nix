@@ -28,7 +28,6 @@
         name = "super-sudoku";
         buildInputs = with pkgs; [
           jdk17
-          gradle
           androidSdk
           python3
         ];
@@ -37,9 +36,8 @@
           export ANDROID_SDK_ROOT="$ANDROID_HOME"
           export JAVA_HOME="${pkgs.jdk17}"
           export PATH="$ANDROID_HOME/platform-tools:$ANDROID_HOME/cmdline-tools/latest/bin:$PATH"
-          # Keep Gradle user home inside the project to avoid polluting $HOME
-          # export GRADLE_USER_HOME="$PWD/.gradle-home"
           echo "Android SDK: $ANDROID_HOME"
+          echo "Use ./gradlew (pinned wrapper 8.14.4); nixpkgs gradle is intentionally not on PATH."
           java -version 2>&1 | head -1
         '';
       };

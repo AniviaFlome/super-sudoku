@@ -11,9 +11,9 @@ import dev.supersudoku.core.Difficulty
 import dev.supersudoku.core.GridDef
 import dev.supersudoku.core.PlayBoard
 import dev.supersudoku.core.Pos
+import dev.supersudoku.core.mismatchedCells
 import dev.supersudoku.core.UndoStack
 import dev.supersudoku.core.Variant
-import dev.supersudoku.core.enterDigit
 import dev.supersudoku.core.validateGrid
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -77,17 +77,13 @@ class PracticeViewModel(app: Application) : AndroidViewModel(app), BoardPlaygrou
     }
 
     /** Cells whose entry differs from the solution (mistake mode WRONG). */
-    fun wrongCells(): Set<Pos> {
-        val sol = solution() ?: return emptySet()
-        val out = HashSet<Pos>()
-        for (i in 0 until 81) {
-            val v = board.value[i]
-            if (v != 0 && !board.given[i] && sol[i] != v) {
-                out.add(Pos(i % 9, i / 9))
-            }
-        }
-        return out
-    }
+    fun wrongCells(): Set<Pos> =
+        solution()?.let { sol ->
+            mismatchedCells(
+                9, 9, board::get, board::isGiven,
+                solutionAt = { x, y -> sol[y * 9 + x] },
+            )
+        } ?: emptySet()
 
     private var saveJob: Job? = null
 
@@ -146,31 +142,6 @@ class PracticeViewModel(app: Application) : AndroidViewModel(app), BoardPlaygrou
     override fun redo() = undo.redo().also { if (it) touch() }
     override fun canUndo() = undo.canUndo()
     override fun canRedo() = undo.canRedo()
-
-    /** Remaining counts per digit. Givens don't count as "filled". */
-    override fun remainingCounts(): IntArray {
-        val givenCount = IntArray(10)
-        val userCount = IntArray(10)
-        for (i in 0 until 81) {
-            val v = board.value[i]
-            if (v in 1..9) {
-                if (board.given[i]) givenCount[v]++ else userCount[v]++
-            }
-        }
-        return IntArray(10) { d -> if (d == 0) 0 else 9 - givenCount[d] - userCount[d] }
-    }
-
-    /** User-only progress: Pair(userFilled, fillable). Givens excluded. */
-    fun userProgress(): Pair<Int, Int> {
-        var fillable = 0
-        var filled = 0
-        for (i in 0 until 81) {
-            if (board.given[i]) continue
-            fillable++
-            if (board.value[i] != 0) filled++
-        }
-        return filled to fillable
-    }
 
     /** Cells to flag red under the current mistake mode. */
     override fun flaggedCells(mode: MistakeMode): Set<Pos> = when (mode) {

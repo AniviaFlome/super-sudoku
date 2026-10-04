@@ -66,15 +66,6 @@ object SuperGenerator {
         val floors = template.grids.associate { g ->
             g.id to (g.givens.size * minPerGridFraction).toInt().coerceAtLeast(6)
         }
-        fun gridCounts(givens: Map<Pos, Int>): Map<String, Int> {
-            val counts = HashMap<String, Int>()
-            for (g in template.grids) {
-                var n = 0
-                for ((p, _) in g.givens) if (p in givens) n++
-                counts[g.id] = n
-            }
-            return counts
-        }
         val givens = HashMap(base)
         val order = givens.keys.shuffled(random)
         val deadline = System.currentTimeMillis() + timeBudgetMs

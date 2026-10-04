@@ -1,6 +1,9 @@
 package dev.supersudoku.app.ui
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
@@ -40,6 +43,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.dp
 import dev.supersudoku.app.state.MistakeMode
@@ -73,6 +77,7 @@ fun SingleBoardScreen(
     val bidir by settings.bidirectionalSelection.collectAsState(initial = true)
     val clearPeers by settings.autoClearPeerNotes.collectAsState(initial = true)
     val dimDone by settings.dimCompletedDigits.collectAsState(initial = true)
+    val buttonsLeft by settings.keypadButtonsLeft.collectAsState(initial = false)
     var popupFor by remember { mutableStateOf<Pos?>(null) }
     val focus = rememberBoardFocus()
     // Dialogs steal keyboard focus; hand it back on dismiss.
@@ -86,8 +91,9 @@ fun SingleBoardScreen(
             .boardKeys(vm, focus, tapMode, clearPeers)
     ) {
         Row(
-            Modifier.fillMaxWidth().background(BoardColors.bg)
+            Modifier.fillMaxWidth()
                 .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top))
+                .background(BoardColors.bg)
                 .padding(horizontal = 4.dp, vertical = 2.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -120,7 +126,7 @@ fun SingleBoardScreen(
         }
         @Suppress("UNUSED_EXPRESSION")
         vm.boardVersion
-        BoxWithConstraints(Modifier.weight(1f).fillMaxWidth()) {
+        BoxWithConstraints(Modifier.weight(1f).fillMaxWidth().background(BoardColors.bg)) {
             val wide = maxWidth > maxHeight && (maxWidth > 600.dp || maxHeight < 500.dp)
             if (!vm.ready) {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -143,6 +149,7 @@ fun SingleBoardScreen(
                         Pad(
                             vm, settings, scope, tapMode, clearPeers, dimDone,
                             vertical = true,
+                            buttonsLeft = buttonsLeft,
                         )
                     }
                 }
@@ -151,7 +158,7 @@ fun SingleBoardScreen(
                     Box(Modifier.weight(1f).fillMaxWidth()) {
                         SingleBoard(vm, sameDigitOn, mistakeMode, tapMode, bidir) { popupFor = it }
                     }
-                    Pad(vm, settings, scope, tapMode, clearPeers, dimDone)
+                    Pad(vm, settings, scope, tapMode, clearPeers, dimDone, buttonsLeft = buttonsLeft)
                 }
             }
         }
@@ -159,7 +166,7 @@ fun SingleBoardScreen(
             val marksMode = vm.notesMode || vm.cornerMode
             CellPopup(
                 title = "Cell ${pos.x + 1}, ${pos.y + 1}",
-                notesMode = marksMode,
+                notesMode = vm.notesMode,
                 canUndo = vm.canUndo(),
                 canRedo = vm.canRedo(),
                 onDigit = {
@@ -176,7 +183,8 @@ fun SingleBoardScreen(
                     }
                     popupFor = null
                 },
-                onToggleNotes = vm::toggleNotesMode,
+                onToggleNotes = vm::toggleCenterMarks,
+                onToggleCorner = vm::toggleCornerMarks,
                 onUndo = { vm.undo() },
                 onRedo = { vm.redo() },
                 onDismiss = { popupFor = null },
@@ -196,17 +204,19 @@ private fun Pad(
     clearPeers: Boolean,
     dimDone: Boolean,
     vertical: Boolean = false,
+    buttonsLeft: Boolean = false,
 ) {
     val sel = vm.selection
     val editableSel = sel != null && !vm.board.isGiven(sel.x, sel.y)
     val padEnabled = tapMode == TapMode.INSERT || editableSel
     KeypadPanel(
-        notesMode = vm.notesMode || vm.cornerMode,
+        notesMode = vm.notesMode,
         canUndo = vm.canUndo(),
         canRedo = vm.canRedo(),
         onDigit = { vm.tapDigit(it, tapMode, clearPeers) },
         onPencilDigit = vm::pencil,
-        onToggleNotes = vm::toggleNotesMode,
+        onToggleNotes = vm::toggleCenterMarks,
+        onToggleCorner = vm::toggleCornerMarks,
         onUndo = { vm.undo() },
         onRedo = { vm.redo() },
         remaining = remember(vm.boardVersion) { vm.remainingCounts() },
@@ -220,6 +230,7 @@ private fun Pad(
         cornerMode = vm.cornerMode,
         dimCompleted = dimDone,
         vertical = vertical,
+        buttonsLeft = buttonsLeft,
     )
 }
 
@@ -252,6 +263,9 @@ private fun SingleBoard(
         Canvas(
             Modifier
                 .fillMaxSize()
+                .testTag("singleBoard")
+                .semantics { contentDescription = "Single board, ${flagged.size} flagged" }
+                .clipToBounds()
                 .background(BoardColors.bg)
                 .pointerInput(cell, ox, oy, tapMode, bidir) {
                     detectTapGestures { tap ->

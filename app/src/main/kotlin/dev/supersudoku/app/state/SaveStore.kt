@@ -67,34 +67,7 @@ object SaveStore {
         }.getOrNull()
     }
 
-    fun hasBoard(context: Context, name: String) = boardFile(context, name).exists()
-
     private fun practiceFile(context: Context) = File(context.filesDir, "practice_save.json")
-
-    fun hasPractice(context: Context) = practiceFile(context).exists()
-
-    /** Saved practice difficulty, if any (cheap metadata read, no board needed). */
-    fun practiceDifficulty(context: Context): Difficulty? = try {
-        val f = practiceFile(context)
-        if (!f.exists()) null
-        else Difficulty.valueOf(json.decodeFromString<PracticeSave>(f.readText()).difficulty)
-    } catch (_: Exception) {
-        null
-    }
-
-    suspend fun savePractice(
-        context: Context,
-        difficulty: Difficulty,
-        puzzle: IntArray,
-        values: IntArray,
-        notes: IntArray,
-    ) = withContext(Dispatchers.IO) {
-        practiceFile(context).writeText(
-            json.encodeToString(
-                PracticeSave(difficulty.name, puzzle.toList(), values.toList(), notes.toList())
-            )
-        )
-    }
 
     data class PracticeLoaded(
         val difficulty: Difficulty,

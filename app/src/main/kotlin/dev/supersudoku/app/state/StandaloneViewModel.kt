@@ -9,6 +9,7 @@ import androidx.lifecycle.viewModelScope
 import dev.supersudoku.core.GridDef
 import dev.supersudoku.core.PlayBoard
 import dev.supersudoku.core.Pos
+import dev.supersudoku.core.mismatchedCells
 import dev.supersudoku.core.UndoStack
 import dev.supersudoku.core.validateGrid
 import kotlinx.coroutines.Job
@@ -25,7 +26,21 @@ interface SingleBoardVm : BoardPlayground {
     override fun undo(): Boolean
     override fun redo(): Boolean
     fun flaggedCells(mode: MistakeMode): Set<Pos>
-    fun remainingCounts(): IntArray
+    /**
+     * Remaining counts per digit. Givens don't count as "filled".
+     * Shared default: both single-board VMs play a full 9x9.
+     */
+    fun remainingCounts(): IntArray {
+        val givenCount = IntArray(10)
+        val userCount = IntArray(10)
+        for (i in 0 until 81) {
+            val v = board.value[i]
+            if (v in 1..9) {
+                if (board.given[i]) givenCount[v]++ else userCount[v]++
+            }
+        }
+        return remainingFromCounts(givenCount, userCount)
+    }
 }
 
 /** Standalone variant game: independent 9x9 with its own givens and save. */
@@ -189,30 +204,13 @@ class StandaloneViewModel(app: Application) : AndroidViewModel(app), SingleBoard
     override fun undo() = undo.undo().also { if (it) touch() }
     override fun redo() = undo.redo().also { if (it) touch() }
 
-    /** Remaining counts per digit. Givens don't count as "filled". */
-    override fun remainingCounts(): IntArray {
-        val givenCount = IntArray(10)
-        val userCount = IntArray(10)
-        for (i in 0 until 81) {
-            val v = board.value[i]
-            if (v in 1..9) {
-                if (board.given[i]) givenCount[v]++ else userCount[v]++
-            }
-        }
-        return IntArray(10) { d -> if (d == 0) 0 else 9 - givenCount[d] - userCount[d] }
-    }
-
     /** Cells whose entry differs from the known solution. */
-    fun wrongCells(): Set<Pos> {
-        val out = HashSet<Pos>()
-        for (i in 0 until 81) {
-            val v = board.value[i]
-            if (v != 0 && !board.given[i] && solution[i] != 0 && solution[i] != v) {
-                out.add(Pos(i % 9, i / 9))
-            }
-        }
-        return out
-    }
+    fun wrongCells(): Set<Pos> =
+        mismatchedCells(
+            9, 9, board::get, board::isGiven,
+            solutionAt = { x, y -> solution[y * 9 + x].takeIf { it != 0 } },
+            flagUnknownSolution = false,
+        )
 
     override fun flaggedCells(mode: MistakeMode): Set<Pos> = when (mode) {
         MistakeMode.OFF -> emptySet()

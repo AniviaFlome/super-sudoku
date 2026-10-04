@@ -361,11 +361,15 @@ object PenpaImport {
         // pass 2: re-home shared inequalities/dots to matching-variant rects
         // (e.g. overlap dots belong to the Consecutive grid, not its neighbours)
         fun rehome(
-            items: List<Pair<Set<Rect>, Any>>,
+            items: List<Triple<Set<Rect>, Any, String>>,
             want: Variant,
+            kind: String,
         ): Map<Rect, List<Any>> {
             val out = mutableMapOf<Rect, MutableList<Any>>()
-            for ((rectsOf, item) in items) {
+            for ((rectsOf, item, where) in items) {
+                if (rectsOf.isEmpty()) {
+                    throw PenpaImportError("$kind at $where spans no single 9x9 grid")
+                }
                 val keep = rectsOf.filter { r ->
                     built.first { it.rect == r }.variant == want
                 }.ifEmpty { rectsOf.toList() }
@@ -375,15 +379,25 @@ object PenpaImport {
         }
         val ineqHome = rehome(
             ineqs.map { e ->
-                built.map { it.rect }.filter { r -> r.contains(e.a) && r.contains(e.b) }.toSet() to (e as Any)
+                Triple(
+                    built.map { it.rect }.filter { r -> r.contains(e.a) && r.contains(e.b) }.toSet(),
+                    e as Any,
+                    "${e.a}-${e.b}",
+                )
             },
             Variant.FUTOSHIKI,
+            "inequality",
         )
         val dotHome = rehome(
             dots.map { (a, b) ->
-                built.map { it.rect }.filter { r -> r.contains(a) && r.contains(b) }.toSet() to (Pair(a, b) as Any)
+                Triple(
+                    built.map { it.rect }.filter { r -> r.contains(a) && r.contains(b) }.toSet(),
+                    (Pair(a, b) as Any),
+                    "$a-$b",
+                )
             },
             Variant.KROPKI,
+            "consecutive dot",
         )
         val grids = mutableListOf<GridDef>()
         built.forEachIndexed { gi, b ->
@@ -562,12 +576,28 @@ object PenpaImport {
     /** Disjoint groups if leftover surfaces validate (each color ×9, position-consistent). */
     internal fun deriveDisjoint(r: Rect, leftover: Map<Pos, Int>): List<Set<Pos>>? {
         if (leftover.isEmpty()) return null
-        if (leftover.keys.any { it.x !in r.x until r.x + 9 || it.y !in r.y until r.y + 9 }) return null
+        val outside = leftover.keys.firstOrNull { it.x !in r.x until r.x + 9 || it.y !in r.y until r.y + 9 }
+        if (outside != null) throw PenpaImportError("surface at $outside is outside every 9x9 grid")
         val byColor = leftover.entries.groupBy({ it.value }, { it.key })
-        if (byColor.values.any { it.size != 9 }) return null
-        for ((_, cells) in byColor) {
+        // A stray annotation (a few shaded cells) is not a disjoint declaration.
+        // Validate strictly only with positive evidence of Offset Sudoku intent:
+        // at least one color forming a complete group of 9.
+        if (byColor.values.none { it.size == 9 }) return null
+        val badSize = byColor.entries.firstOrNull { it.value.size != 9 }
+        if (badSize != null) {
+            throw PenpaImportError(
+                "offset color ${badSize.key} covers ${badSize.value.size} cells, expected 9 " +
+                    "(or remove the shading if this grid is not Offset Sudoku)"
+            )
+        }
+        for ((color, cells) in byColor) {
             val positions = cells.map { ((it.x - r.x) % 3) to ((it.y - r.y) % 3) }.toSet()
-            if (positions.size != 1) return null
+            if (positions.size != 1) {
+                throw PenpaImportError(
+                    "offset color $color is not position-consistent " +
+                        "(every cell of one color must sit in the same box-relative slot)"
+                )
+            }
         }
         return (0 until 3).flatMap { oy ->
             (0 until 3).map { ox ->
@@ -589,14 +619,17 @@ object PenpaImport {
     }
 
     /**
-     * Trace jigsaw regions from internal style-2 borders. Returns null unless
-     * the result is exactly 9 regions of 9 cells (else the caller falls back
-     * to standard boxes).
+     * Trace jigsaw regions from internal style-2 borders. Returns null when
+     * the grid has no style-2 borders (standard boxes apply); throws when
+     * borders exist but do not form exactly 9 regions of 9 cells.
      */
     internal fun traceRegions(r: Rect, borders: List<Seg>): List<Set<Pos>>? {
-        val hSet = borders.filter { it.style == 2 && it.ay == it.by }
+        val hBorders = borders.filter { it.style == 2 && it.ay == it.by }
+        val vBorders = borders.filter { it.style == 2 && it.ax == it.bx }
+        if (hBorders.isEmpty() && vBorders.isEmpty()) return null
+        val hSet = hBorders
             .map { it.ay to minOf(it.ax, it.bx) }.toSet()
-        val vSet = borders.filter { it.style == 2 && it.ax == it.bx }
+        val vSet = vBorders
             .map { it.ax to minOf(it.ay, it.by) }.toSet()
         val parent = HashMap<Pos, Pos>()
         for (dx in 0 until 9) for (dy in 0 until 9) {
@@ -623,7 +656,12 @@ object PenpaImport {
         }
         val regions = parent.keys.groupBy { find(it) }.values
             .map { it.sortedWith(compareBy({ p: Pos -> p.y }, { p: Pos -> p.x })).toSet() }
-        if (regions.size != 9 || regions.any { it.size != 9 }) return null
+        if (regions.size != 9 || regions.any { it.size != 9 }) {
+            throw PenpaImportError(
+                "jigsaw borders do not form 9 regions of 9 cells " +
+                    "(got ${regions.size} regions)"
+            )
+        }
         return regions.sortedWith(
             compareBy(
                 { it.minOf { p -> p.y } },

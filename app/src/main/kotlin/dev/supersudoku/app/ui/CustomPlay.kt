@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.ui.platform.testTag
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -63,8 +64,14 @@ fun CustomPlayScreen(
         if (entry == null) missing = true
         else vm.ensureLoaded(PuzzleSource.Custom(customId))
     }
+    // One-shot per puzzle: returning from Settings must not clobber live
+    // focus. The guard lives in the view-model (which survives navigation),
+    // not in remember() which resets when the screen leaves composition.
     LaunchedEffect(customId, initialFocusGridId) {
-        if (initialFocusGridId != null) vm.focusGridId = initialFocusGridId
+        if (vm.customFocusAppliedFor != customId) {
+            vm.customFocusAppliedFor = customId
+            if (initialFocusGridId != null) vm.focusGridId = initialFocusGridId
+        }
     }
     if (missing) {
         Box(Modifier.fillMaxSize().background(BoardColors.bg), contentAlignment = Alignment.Center) {
@@ -147,13 +154,14 @@ fun ImportScreen(onBack: () -> Unit, onImported: (String) -> Unit) {
             value = url,
             onValueChange = { url = it; error = null },
             label = { Text("Penpa+ URL") },
-            modifier = Modifier.fillMaxWidth().heightIn(max = 220.dp),
+            modifier = Modifier.fillMaxWidth().heightIn(max = 220.dp).testTag("importUrl"),
             minLines = 3,
         )
         Spacer(Modifier.height(12.dp))
         Button(
             onClick = ::doImport,
             enabled = !busy && url.isNotBlank(),
+            modifier = Modifier.testTag("importButton"),
             colors = ButtonDefaults.buttonColors(
                 containerColor = BoardColors.entry,
                 contentColor = BoardColors.bg,

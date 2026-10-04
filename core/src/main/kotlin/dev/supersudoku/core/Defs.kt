@@ -10,7 +10,11 @@ enum class Variant {
     CLASSIC, FUTOSHIKI, ADDITION, KILLER, KROPKI, SUDOKU_X, IRREGULAR, DISJOINT;
 
     companion object {
-        fun of(s: String): Variant = valueOf(s.uppercase())
+        fun of(s: String): Variant = try {
+            valueOf(s.uppercase())
+        } catch (_: IllegalArgumentException) {
+            throw IllegalArgumentException("unknown variant '$s' (expected one of ${entries.joinToString()})")
+        }
     }
 }
 
@@ -72,8 +76,10 @@ data class SuperPuzzle(val grids: List<GridDef>, val labels: List<BoardLabel>) {
     /** Tight board extents covering all grids (for rendering/sizing). */
     fun boardSize(): Pair<Int, Int> {
         if (grids.isEmpty()) return 9 to 9
-        val w = grids.maxOf { it.x + 9 }
-        val h = grids.maxOf { it.y + 9 }
+        val minX = grids.minOf { it.x }
+        val minY = grids.minOf { it.y }
+        val w = grids.maxOf { it.x + 9 } - minX
+        val h = grids.maxOf { it.y + 9 } - minY
         return w to h
     }
 

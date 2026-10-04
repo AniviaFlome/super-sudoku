@@ -25,19 +25,6 @@ object SuperStore {
     @Serializable
     private data class BoardSave(val values: List<Int>, val notes: List<Int>)
 
-    data class SuperEntry(
-        /** "bundled" or "custom:<id>". */
-        val key: String,
-        val title: String,
-        val subtitle: String,
-        val gridCount: Int,
-        val userFilled: Int,
-        val fillable: Int,
-        val doneGrids: Int,
-        val solved: Boolean,
-        val hasSave: Boolean,
-    )
-
     data class GridStat(
         val grid: GridDef,
         val userFilled: Int,
@@ -105,57 +92,6 @@ object SuperStore {
         return PuzzleDetail(puzzle, "", gridStats, filled, fillable)
     }
 
-    suspend fun list(context: Context): List<SuperEntry> = withContext(Dispatchers.IO) {
-        val out = ArrayList<SuperEntry>()
-        // Bundled
-        runCatching {
-            val text = context.assets.open("puzzle.json").bufferedReader().use { it.readText() }
-            val puzzle = PuzzleLoader.load(text)
-            val values = readSaveValues(context, "super_save.json")
-            val detail = statsFor(puzzle, values)
-            val done = detail.grids.count { it.solved }
-            out.add(
-                SuperEntry(
-                    key = "bundled",
-                    title = "Carykh's Super Sudoku",
-                    subtitle = "normal · >sudoku< · addition · killer · consecutive · X · strange boxes · offset",
-                    gridCount = puzzle.grids.size,
-                    userFilled = detail.userFilled,
-                    fillable = detail.fillable,
-                    doneGrids = done,
-                    solved = done == puzzle.grids.size && puzzle.grids.isNotEmpty(),
-                    hasSave = values != null,
-                )
-            )
-        }
-        // Customs
-        val customs = CustomStore.list(context)
-        for (e in customs) {
-            runCatching {
-                val loaded = CustomStore.load(context, e.id) ?: return@runCatching
-                val (puzzle, _) = loaded
-                val values = readSaveValues(context, "custom_${e.id}.json")
-                val detail = statsFor(puzzle, values)
-                val done = detail.grids.count { it.solved }
-                out.add(
-                    SuperEntry(
-                        key = "custom:${e.id}",
-                        title = e.name,
-                        subtitle = "${puzzle.grids.size} grid${if (puzzle.grids.size == 1) "" else "s"}" +
-                            if (e.hasSolution) " · solution known" else "",
-                        gridCount = puzzle.grids.size,
-                        userFilled = detail.userFilled,
-                        fillable = detail.fillable,
-                        doneGrids = done,
-                        solved = done == puzzle.grids.size && puzzle.grids.isNotEmpty(),
-                        hasSave = values != null,
-                    )
-                )
-            }
-        }
-        out
-    }
-
     /** Full per-grid detail for one library key (for the level rows + random). */
     suspend fun detail(context: Context, key: String): PuzzleDetail? = withContext(Dispatchers.IO) {
         if (key == "bundled") {
@@ -170,13 +106,6 @@ object SuperStore {
                 val loaded = loadMap(context, key.removePrefix("map:")) ?: return@runCatching null
                 val (puzzle, _, saveName) = loaded
                 statsFor(puzzle, readSaveValues(context, saveName)).copy(saveName = saveName)
-            }.getOrNull()
-        } else if (key.startsWith("custom:")) {
-            runCatching {
-                val (puzzle, _) = CustomStore.load(context, key.removePrefix("custom:")) ?: return@runCatching null
-                val id = key.removePrefix("custom:")
-                val values = readSaveValues(context, "custom_$id.json")
-                statsFor(puzzle, values).copy(saveName = "custom_$id.json")
             }.getOrNull()
         } else null
     }
@@ -216,12 +145,6 @@ object SuperStore {
     private fun currentFile(context: Context) = File(context.filesDir, "super_current_map.txt")
 
     fun mapSaveName(id: String) = "supermap_$id.json"
-
-    /** Cheap count of generated maps (for the home folder row). */
-    fun mapsCount(context: Context): Int =
-        runCatching {
-            mapsDir(context).listFiles { f -> f.name.endsWith(".json") }?.size ?: 0
-        }.getOrDefault(0)
 
     /** Display name for one map ("Map #n"), or null when missing. */
     fun mapName(context: Context, id: String): String? = runCatching {
@@ -330,10 +253,18 @@ object SuperStore {
             timeBudgetMs = difficulty.timeBudgetMs,
         )
         if (out.removedCount == 0) return@withContext null
-        val id = "m${System.currentTimeMillis()}"
         val now = System.currentTimeMillis()
+        // Random suffix: two taps in the same millisecond must not share an id.
+        // Stable display number: max(existing) + 1, so deleting a map never
+        // reuses a visible "Map #n".
+        val id = "m${now}x${kotlin.random.Random(now).nextInt(0, 1_000_000)}"
         val number = withContext(Dispatchers.IO) {
-            val n = (mapsDir(context).listFiles { f -> f.name.endsWith(".json") }?.size ?: 0) + 1
+            val n = (
+                mapsDir(context).listFiles { f -> f.name.endsWith(".json") }
+                    ?.mapNotNull { f ->
+                        runCatching { json.decodeFromString<MapFile>(f.readText()).number }.getOrNull()
+                    }?.maxOrNull() ?: 0
+                ) + 1
             mapFile(context, id).writeText(
                 json.encodeToString(
                     MapFile(

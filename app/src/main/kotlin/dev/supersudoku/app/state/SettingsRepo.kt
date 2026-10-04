@@ -141,4 +141,19 @@ class SettingsRepo(private val context: Context) {
     suspend fun setOrientation(v: Orientation) {
         context.settingsStore.edit { it[orientationKey] = v.name }
     }
+
+    // ---- Keypad layout ----
+
+    private val buttonsLeftKey = booleanPreferencesKey("keypad_buttons_left")
+
+    /**
+     * Mirror the keypad: mode/tool button columns on the left, digits on
+     * the right. Default false (current behavior: digits left, buttons right).
+     */
+    val keypadButtonsLeft: Flow<Boolean> =
+        context.settingsStore.data.map { it[buttonsLeftKey] ?: false }
+
+    suspend fun setKeypadButtonsLeft(v: Boolean) {
+        context.settingsStore.edit { it[buttonsLeftKey] = v }
+    }
 }

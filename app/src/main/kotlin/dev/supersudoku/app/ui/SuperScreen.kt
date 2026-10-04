@@ -3,6 +3,7 @@ package dev.supersudoku.app.ui
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectTransformGestures
@@ -29,8 +30,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.ZoomIn
-import androidx.compose.material.icons.filled.ZoomOut
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -54,6 +53,9 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.dp
 import dev.supersudoku.app.state.MistakeMode
@@ -81,8 +83,16 @@ fun SuperScreen(
     onOpenSettings: () -> Unit,
 ) {
     LaunchedEffect(vm, source) { vm.ensureLoaded(source) }
-    LaunchedEffect(vm, source, initialFocusGridId, focusNonce) {
-        vm.focusGridId = initialFocusGridId
+    // Apply the requested focus only on an explicit navigation (focusNonce
+    // bump: map chosen, fresh map minted). Returning from Settings (or any
+    // recomposition) must never clobber the live focus with a stale value.
+    // The applied nonce lives in the view-model (which outlives the
+    // composition across settings trips), not in remember().
+    LaunchedEffect(vm, source, focusNonce) {
+        if (vm.lastAppliedFocusNonce != focusNonce) {
+            vm.lastAppliedFocusNonce = focusNonce
+            vm.focusGridId = initialFocusGridId
+        }
     }
     SuperBoardContent(vm, settings, onBack, onOpenSettings)
 }
@@ -101,6 +111,7 @@ fun SuperBoardContent(
     val bidir by settings.bidirectionalSelection.collectAsState(initial = true)
     val clearPeers by settings.autoClearPeerNotes.collectAsState(initial = true)
     val dimDone by settings.dimCompletedDigits.collectAsState(initial = true)
+    val buttonsLeft by settings.keypadButtonsLeft.collectAsState(initial = false)
     val doubleTap by settings.focusOnDoubleTap.collectAsState(initial = true)
     var popupFor by remember { mutableStateOf<Pos?>(null) }
     val focus = rememberBoardFocus()
@@ -145,20 +156,20 @@ fun SuperBoardContent(
                             .verticalScroll(rememberScrollState())
                     ) {
                         Spacer(Modifier.height(8.dp))
-                        InputBar(vm, tapMode, settings, clearPeers, dimDone, vertical = true)
+                        InputBar(vm, tapMode, settings, clearPeers, dimDone, vertical = true, buttonsLeft = buttonsLeft)
                     }
                 }
             } else {
-                Column(Modifier.fillMaxSize()) {
+                Column(Modifier.fillMaxSize().background(BoardColors.bg)) {
                     SuperTopBar(vm, onBack, onOpenSettings)
-                    Box(Modifier.weight(1f).fillMaxWidth()) {
+                    Box(Modifier.weight(1f).fillMaxWidth().background(BoardColors.bg)) {
                         if (focusGrid == null) {
                             OverviewBoard(vm, p, sameDigitOn, mistakeMode, tapMode, bidir, clearPeers, doubleTap) { popupFor = it }
                         } else {
                             FocusBoard(vm, p, focusGrid, sameDigitOn, mistakeMode, tapMode, bidir, clearPeers) { popupFor = it }
                         }
                     }
-                    InputBar(vm, tapMode, settings, clearPeers, dimDone)
+                    InputBar(vm, tapMode, settings, clearPeers, dimDone, buttonsLeft = buttonsLeft)
                 }
             }
             popupFor?.let { pos ->
@@ -167,7 +178,7 @@ fun SuperBoardContent(
                 CellPopup(
                     title = if (f != null) "Cell ${pos.x - f.x + 1}, ${pos.y - f.y + 1}"
                     else "Cell ${pos.x + 1}, ${pos.y + 1}",
-                    notesMode = marksMode,
+                    notesMode = vm.notesMode,
                     canUndo = vm.canUndo(),
                     canRedo = vm.canRedo(),
                     onDigit = {
@@ -184,7 +195,8 @@ fun SuperBoardContent(
                         }
                         popupFor = null
                     },
-                    onToggleNotes = vm::toggleNotesMode,
+                    onToggleNotes = vm::toggleCenterMarks,
+                    onToggleCorner = vm::toggleCornerMarks,
                     onUndo = { vm.undo() },
                     onRedo = { vm.redo() },
                     onDismiss = { popupFor = null },
@@ -203,37 +215,23 @@ private fun SuperTopBar(
     onOpenSettings: () -> Unit,
 ) {
     Row(
-        Modifier.fillMaxWidth().background(BoardColors.bg)
+        Modifier.fillMaxWidth()
             .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top))
+            .background(BoardColors.bg)
             .padding(horizontal = 4.dp, vertical = 2.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         IconButton(onClick = {
             if (vm.focusGridId != null) vm.focusGridId = null else onBack()
         }) { Icon(Icons.Filled.ArrowBack, "Back", tint = BoardColors.given) }
-        val focus = vm.focusGrid()
         Column(Modifier.weight(1f)) {
             Text(
-                focus?.name ?: "Super Sudoku",
+                "Super Sudoku",
                 style = MaterialTheme.typography.titleMedium,
                 color = BoardColors.given,
                 maxLines = 1,
                 overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
             )
-            val sel = vm.selection
-            val names = vm.gridsAtSelection().map { it.name }
-            // In focus mode a single-grid subtitle would just echo the title.
-            val showNames = sel != null && names.isNotEmpty() &&
-                (focus == null || names.size > 1 || names[0] != focus.name)
-            if (showNames) {
-                Text(
-                    names.joinToString(" + "),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = BoardColors.dim,
-                    maxLines = 1,
-                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
-                )
-            }
         }
         Text(
             formatTime(vm.playSeconds),
@@ -337,6 +335,9 @@ private fun OverviewBoard(
         Canvas(
             Modifier
                 .fillMaxSize()
+                .testTag("overviewBoard")
+                .semantics { contentDescription = "Overview board, ${flagged.size} flagged" }
+                .clipToBounds()
                 .background(BoardColors.bg)
                 .pointerInput(Unit) {
                     // mouse wheel: zoom at cursor (desktop/Waydroid); drag pans, pinch zooms
@@ -470,26 +471,6 @@ private fun OverviewBoard(
                 if (g.inequalities.isNotEmpty()) drawInequalities(g, toPx, cell)
                 if (g.dots.isNotEmpty()) drawDots(g, toPx, cell)
             }
-            drawLabels(puzzle.labels, toPx, cell, measurer)
-        }
-        // Floating zoom controls (kept off the top bar so titles never wrap).
-        Column(
-            Modifier.align(Alignment.BottomEnd).padding(12.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            androidx.compose.material3.FilledTonalIconButton(
-                onClick = { vm.scale = (vm.scale * 1.5f).coerceIn(0.4f, 20f) },
-                modifier = Modifier.size(44.dp),
-            ) {
-                Icon(Icons.Filled.ZoomIn, "Zoom in", tint = BoardColors.given)
-            }
-            Spacer(Modifier.height(8.dp))
-            androidx.compose.material3.FilledTonalIconButton(
-                onClick = { vm.scale = (vm.scale / 1.5f).coerceIn(0.4f, 20f) },
-                modifier = Modifier.size(44.dp),
-            ) {
-                Icon(Icons.Filled.ZoomOut, "Zoom out", tint = BoardColors.given)
-            }
         }
     }
 }
@@ -512,7 +493,7 @@ private fun FocusBoard(
     Column(Modifier.fillMaxSize()) {
         // prev/next strip (completion stays hidden while playing)
         Row(
-            Modifier.fillMaxWidth().padding(horizontal = 8.dp),
+            Modifier.fillMaxWidth().background(BoardColors.bg).padding(horizontal = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             val idx = puzzle.grids.indexOf(grid)
@@ -559,7 +540,7 @@ private fun FocusBoard(
             val glyphs = remember(measurer, density, cell) { GlyphCache(measurer, density, cell) }
             @Suppress("UNUSED_EXPRESSION")
             vm.boardVersion
-            val centerMarks = rememberCenterMarks(vm.board, vm.boardVersion, glyphs, grid.cells())
+            val centerMarks = rememberCenterMarks(vm.board, vm.boardVersion, glyphs, grid.cells(), grid.id)
             val flagged = remember(vm.boardVersion, grid.id, mistakeMode) {
                 vm.flaggedCells(mistakeMode).filter { it in grid.cells() }.toSet()
             }
@@ -591,6 +572,9 @@ private fun FocusBoard(
             Canvas(
                 Modifier
                     .fillMaxSize()
+                    .testTag("focusBoard")
+                    .semantics { contentDescription = "Focus board, ${flagged.size} flagged" }
+                    .clipToBounds()
                     .background(BoardColors.bg)
                     .pointerInput(grid.id, cell, ox, oy, tapMode, bidir, clearPeers) {
                         detectTapGestures { tap ->
@@ -642,6 +626,7 @@ fun InputBar(
     clearPeers: Boolean,
     dimDone: Boolean,
     vertical: Boolean = false,
+    buttonsLeft: Boolean = false,
 ) {
     @Suppress("UNUSED_EXPRESSION")
     vm.boardVersion // subscribe
@@ -651,12 +636,13 @@ fun InputBar(
     val editableSel = sel != null && vm.board.inBounds(sel.x, sel.y) && !vm.board.isGiven(sel.x, sel.y)
     val padEnabled = tapMode == TapMode.INSERT || editableSel
     KeypadPanel(
-        notesMode = vm.notesMode || vm.cornerMode,
+        notesMode = vm.notesMode,
         canUndo = vm.canUndo(),
         canRedo = vm.canRedo(),
         onDigit = { vm.tapDigit(it, tapMode, clearPeers) },
         onPencilDigit = vm::pencil,
-        onToggleNotes = vm::toggleNotesMode,
+        onToggleNotes = vm::toggleCenterMarks,
+        onToggleCorner = vm::toggleCornerMarks,
         onUndo = { vm.undo() },
         onRedo = { vm.redo() },
         remaining = remaining,
@@ -671,5 +657,6 @@ fun InputBar(
         cornerMode = vm.cornerMode,
         dimCompleted = dimDone,
         vertical = vertical,
+        buttonsLeft = buttonsLeft,
     )
 }

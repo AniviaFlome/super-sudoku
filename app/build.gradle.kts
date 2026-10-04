@@ -16,8 +16,9 @@ android {
         applicationId = "dev.supersudoku.app"
         minSdk = 26
         targetSdk = 36
-        versionCode = 4
-        versionName = "1.0.3"
+        versionCode = 5
+        versionName = "1.1.0"
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
     // Release key location: local.properties (developer machine) or
@@ -32,19 +33,37 @@ android {
     fun keyProp(name: String, env: String): String? =
         keyProps.getProperty(name) ?: System.getenv(env)
 
+    // Fail fast on a half-configured key: an incomplete signingConfig either
+    // breaks assembleRelease obscurely or ships an unsigned "release" build.
+    val releaseKey = mapOf(
+        "storeFile" to keyProp("release.storeFile", "KEYSTORE_PATH"),
+        "storePassword" to keyProp("release.storePassword", "KEYSTORE_PASSWORD"),
+        "keyAlias" to keyProp("release.keyAlias", "KEY_ALIAS"),
+        "keyPassword" to keyProp("release.keyPassword", "KEY_PASSWORD"),
+    )
+    val presentKeys = releaseKey.filterValues { !it.isNullOrBlank() }.keys
+    if (presentKeys.isNotEmpty() && presentKeys.size < releaseKey.size) {
+        error(
+            "Incomplete release signing config: set all of " +
+                "${releaseKey.keys} (local.properties or KEYSTORE_PATH/KEYSTORE_PASSWORD/" +
+                "KEY_ALIAS/KEY_PASSWORD env), or none for an unsigned verification build. " +
+                "Missing: ${(releaseKey.keys - presentKeys).joinToString()}"
+        )
+    }
+
     signingConfigs {
         create("release") {
-            keyProp("release.storeFile", "KEYSTORE_PATH")?.let { storeFile = rootProject.file(it) }
-            keyProp("release.storePassword", "KEYSTORE_PASSWORD")?.let { storePassword = it }
-            keyProp("release.keyAlias", "KEY_ALIAS")?.let { keyAlias = it }
-            keyProp("release.keyPassword", "KEY_PASSWORD")?.let { keyPassword = it }
+            releaseKey["storeFile"]?.let { storeFile = rootProject.file(it) }
+            storePassword = releaseKey["storePassword"]
+            keyAlias = releaseKey["keyAlias"]
+            keyPassword = releaseKey["keyPassword"]
         }
     }
 
     buildTypes {
         release {
             isMinifyEnabled = false
-            if (keyProp("release.storeFile", "KEYSTORE_PATH") != null) {
+            if (presentKeys.size == releaseKey.size) {
                 signingConfig = signingConfigs.getByName("release")
             }
         }
@@ -58,25 +77,44 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
+    testOptions {
+        animationsDisabled = true
+    }
+}
+
+// androidx.test 1.6.x needs tracing 1.1.0, but the Compose BOM pins 1.0.0
+// (strict constraint). Force the newer tracing: tiny stable lib, safe bump.
+configurations.configureEach {
+    resolutionStrategy.force("androidx.tracing:tracing:1.1.0")
 }
 
 dependencies {
     implementation(project(":core"))
-    val composeBom = platform("androidx.compose:compose-bom:2024.10.01")
+    val composeBom = platform(libs.compose.bom)
     implementation(composeBom)
     androidTestImplementation(composeBom)
-    implementation("androidx.core:core-ktx:1.13.1")
-    implementation("androidx.activity:activity-compose:1.9.2")
+    implementation(libs.core.ktx)
+    implementation(libs.activity.compose)
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.ui:ui-graphics")
     implementation("androidx.compose.ui:ui-tooling-preview")
     implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.material:material-icons-core")
     implementation("androidx.compose.material:material-icons-extended")
-    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.7.0")
-    implementation("androidx.lifecycle:lifecycle-viewmodel:2.7.0")
-    implementation("androidx.datastore:datastore-preferences:1.1.1")
-    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
+    implementation(libs.lifecycle.viewmodel.compose)
+    implementation(libs.lifecycle.viewmodel)
+    implementation(libs.datastore.preferences)
+    implementation(libs.serialization.json)
     debugImplementation("androidx.compose.ui:ui-tooling")
+    debugImplementation("androidx.compose.ui:ui-test-manifest")
+    testImplementation(libs.junit)
+    androidTestImplementation(libs.junit)
+    androidTestImplementation(libs.test.ext.junit)
+    androidTestImplementation(libs.espresso.core)
+    androidTestImplementation(libs.test.runner)
+    androidTestImplementation(libs.test.rules)
+    androidTestImplementation("androidx.compose.ui:ui-test-junit4")
+    androidTestImplementation("androidx.compose.ui:ui-tooling")
 }

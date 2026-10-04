@@ -11,7 +11,6 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextMeasurer
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.drawText
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import dev.supersudoku.core.ConflictKind
@@ -118,7 +117,7 @@ class GlyphCache(
         }
     private val cornerG: Map<Int, androidx.compose.ui.text.TextLayoutResult> =
         (1..9).associateWith { d ->
-            measurer.measure(AnnotatedString(d.toString()), style(cellPx * 0.18f))
+            measurer.measure(AnnotatedString(d.toString()), style(cellPx * 0.24f))
         }
 
     private fun measureCenter(text: String, sizePx: Float) =
@@ -275,10 +274,11 @@ fun rememberCenterMarks(
     version: Int,
     glyphs: GlyphCache,
     cells: Iterable<Pos>,
+    key: Any? = Unit,
 ): Map<Pos, androidx.compose.ui.text.TextLayoutResult> {
     @Suppress("UNUSED_EXPRESSION")
     version
-    return remember(version, glyphs) {
+    return remember(version, glyphs, key) {
         buildMap {
             for (p in cells) {
                 val m = board.noteMask(p.x, p.y)
@@ -462,41 +462,4 @@ fun DrawScope.drawDiagonals(grid: GridDef, toPx: (Pos) -> Offset, cellPx: Float)
     val s = 9 * cellPx
     drawLine(BoardColors.diagonal, a, a + Offset(s, s), w)
     drawLine(BoardColors.diagonal, a + Offset(s, 0f), a + Offset(0f, s), w)
-}
-
-/** Corridor labels (overview only): centered compass-style captions. */
-fun DrawScope.drawLabels(
-    labels: List<dev.supersudoku.core.BoardLabel>,
-    toPx: (Pos) -> Offset,
-    cellPx: Float,
-    measurer: TextMeasurer,
-) {
-    // Bounding boxes of already-drawn labels (board px); a label whose box
-    // would intersect one is skipped so words can never print over each other.
-    val drawn = mutableListOf<Pair<Offset, androidx.compose.ui.geometry.Size>>()
-    for (l in labels) {
-        val layout = measurer.measure(
-            AnnotatedString(l.text),
-            TextStyle(
-                fontSize = pxToSp(cellPx * 0.42f),
-                color = BoardColors.dim,
-                fontWeight = FontWeight.Bold,
-            ),
-        )
-        val origin = toPx(Pos(l.x, l.y))
-        val w = layout.size.width.toFloat()
-        val h = layout.size.height.toFloat()
-        // Center on the cell; clamp inside the board so edge labels stay visible.
-        val cx = (origin.x + (cellPx - w) / 2f).coerceIn(0f, (size.width - w).coerceAtLeast(0f))
-        val cy = (origin.y + (cellPx - h) / 2f).coerceIn(0f, (size.height - h).coerceAtLeast(0f))
-        val box = Offset(cx, cy) to androidx.compose.ui.geometry.Size(w, h)
-        if (drawn.any { (o, s) ->
-                cx < o.x + s.width && o.x < cx + w && cy < o.y + s.height && o.y < cy + h
-            }
-        ) {
-            continue
-        }
-        drawn.add(box)
-        drawText(layout, color = BoardColors.dim, topLeft = Offset(cx, cy))
-    }
 }

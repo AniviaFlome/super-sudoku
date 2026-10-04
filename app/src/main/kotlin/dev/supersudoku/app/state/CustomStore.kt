@@ -18,16 +18,17 @@ object CustomStore {
     private fun puzzleFile(context: Context, id: String) = File(dir(context), "$id.json")
     private fun solutionFile(context: Context, id: String) = File(dir(context), "$id.solution.json")
 
-    fun list(context: Context): List<Entry> {
+    /** Newest imports first (by file modification time). Slow: parses every custom; call off the main thread. */
+    suspend fun list(context: Context): List<Entry> = withContext(Dispatchers.IO) {
         val d = dir(context)
-        if (!d.exists()) return emptyList()
-        return d.listFiles { f -> f.name.endsWith(".json") && !f.name.endsWith(".solution.json") }
+        if (!d.exists()) return@withContext emptyList()
+        d.listFiles { f -> f.name.endsWith(".json") && !f.name.endsWith(".solution.json") }
             ?.mapNotNull { f ->
                 runCatching {
                     val text = f.readText()
                     val puzzle = PuzzleLoader.load(text)
                     val id = f.nameWithoutExtension
-                    Entry(
+                    f.lastModified() to Entry(
                         id = id,
                         name = PuzzleLoader.readName(text),
                         gridCount = puzzle.grids.size,
@@ -35,7 +36,8 @@ object CustomStore {
                     )
                 }.getOrNull()
             }
-            ?.sortedBy { it.id }
+            ?.sortedByDescending { (modified, _) -> modified }
+            ?.map { (_, e) -> e }
             ?: emptyList()
     }
 

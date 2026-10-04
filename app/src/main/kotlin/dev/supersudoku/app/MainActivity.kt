@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -120,8 +121,10 @@ class MainActivity : ComponentActivity() {
                 val currentMapId = remember(screenTag, mapsTick) {
                     SuperStore.currentMapId(applicationContext)
                 }
-                val customs = remember(screenTag, customsTick) {
-                    CustomStore.list(applicationContext)
+                // Customs parsing is file I/O: load async so navigation never janks.
+                var customs by remember { mutableStateOf<List<CustomStore.Entry>>(emptyList()) }
+                LaunchedEffect(screenTag, customsTick) {
+                    customs = CustomStore.list(applicationContext)
                 }
                 fun openSettings(from: String) {
                     settingsReturn = from

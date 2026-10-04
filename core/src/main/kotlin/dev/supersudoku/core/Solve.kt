@@ -88,7 +88,8 @@ class SuperSolver(
     fun initialDomains(): IntArray = IntArray(n) { ALL }
 
     fun setGiven(dom: IntArray, p: Pos, v: Int) {
-        val i = index[p] ?: return
+        val i = index[p]
+            ?: throw IllegalArgumentException("setGiven: $p is not part of this solver's cells")
         dom[i] = 1 shl v
     }
 
@@ -304,18 +305,22 @@ class SuperSolver(
                 sMax += maxOf(dom, v)
             }
             if (tVar == -1) {
-                // left of the total: column sum must be a pure carry (0..29)
-                if (sMin > 29) return false
-                carryMin = 0
-                carryMax = 2
+                // Left of the total: the column sum must be an exact
+                // multiple of 10 (a pure carry into the next column).
+                val lo = (sMin + 9) / 10
+                val hi = sMax / 10
+                if (lo > hi) return false
+                carryMin = lo
+                carryMax = hi
                 continue
             }
             val tMin = minOf(dom, tVar)
             val tMax = maxOf(dom, tVar)
             var ok = false
-            var cOutMin = 3
+            var cOutMin = Int.MAX_VALUE
             var cOutMax = -1
-            for (co in 0..2) {
+            // Carry out is bounded by the column sum: 10*co <= sMax.
+            for (co in 0..sMax / 10) {
                 if (tMax + 10 * co >= sMin && tMin + 10 * co <= sMax) {
                     ok = true
                     if (co < cOutMin) cOutMin = co
@@ -330,8 +335,17 @@ class SuperSolver(
         return carryMin <= 0
     }
 
-    /** Depth-first search collecting up to [limit] solutions. */
+    /**
+     * Depth-first search collecting up to [limit] solutions. Clears any
+     * previous results first: a solver instance is single-use per search,
+     * so reusing one never mixes stale solutions into new results.
+     */
     fun search(dom: IntArray, limit: Int = 2): Boolean {
+        solutions.clear()
+        return dfs(dom, limit)
+    }
+
+    private fun dfs(dom: IntArray, limit: Int): Boolean {
         if (solutions.size >= limit) return true
         if (!propagate(dom)) return false
         var pick = -1
@@ -352,7 +366,7 @@ class SuperSolver(
             if (dom[pick] and (1 shl d) != 0) {
                 val next = dom.copyOf()
                 next[pick] = 1 shl d
-                if (search(next, limit)) return true
+                if (dfs(next, limit)) return true
             }
         }
         return solutions.size >= limit

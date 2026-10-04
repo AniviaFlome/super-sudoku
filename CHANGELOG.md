@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.1.0 — 2026-10-05
+
+- Pencil marks are now preserved when entering or erasing a digit (erase reveals the marks again).
+- New Display setting: put the keypad mode/tool buttons on the left, digits on the right (digits-left stays the default).
+- Smaller app icon glyph.
+- Removed the floating zoom buttons on the super board (pinch-to-zoom still works); the board no longer paints over the top bar when panning or zooming.
+- Mistake highlighting verified across all boards: conflicts, wrong-against-solution, or off.
+
 ## 1.0.3 — 2026-09-17
 
 - Fixed the super-board timer being stuck at 0:00 (game clock now runs and saves on exit).

@@ -12,11 +12,10 @@ import dev.supersudoku.core.Conflict
 import dev.supersudoku.core.GridDef
 import dev.supersudoku.core.PlayBoard
 import dev.supersudoku.core.Pos
+import dev.supersudoku.core.mismatchedCells
 import dev.supersudoku.core.PuzzleLoader
 import dev.supersudoku.core.SuperPuzzle
 import dev.supersudoku.core.UndoStack
-import dev.supersudoku.core.enterDigit
-import dev.supersudoku.core.isGridComplete
 import dev.supersudoku.core.toggleNote
 import dev.supersudoku.core.units
 import dev.supersudoku.core.validateSuper
@@ -119,6 +118,16 @@ class SuperViewModel(app: Application) : AndroidViewModel(app), BoardPlayground 
 
     /** Null = overview canvas; otherwise the focused 9x9 grid id. */
     var focusGridId by mutableStateOf<String?>(null)
+
+    /**
+     * Last focus-request nonce already applied by SuperScreen. Kept here
+     * (not in composition remember state) so leaving the screen for
+     * Settings and coming back never re-applies a stale focus request.
+     */
+    var lastAppliedFocusNonce: Int? = null
+
+    /** Custom puzzle id whose initial focus was already applied (same reason). */
+    var customFocusAppliedFor: String? = null
 
     // overview camera (board-space px)
     var cellBase by mutableFloatStateOf(32f)
@@ -271,22 +280,6 @@ class SuperViewModel(app: Application) : AndroidViewModel(app), BoardPlayground 
         touch()
     }
 
-    /** Start over: cleared board, empty undo history, fresh save. */
-    fun newGame() {
-        if (!::board.isInitialized || !::histories.isInitialized) return
-        for (i in board.value.indices) {
-            if (!board.given[i]) {
-                board.value[i] = 0
-                board.notes[i] = 0
-                board.corner[i] = 0
-            }
-        }
-        histories.clear()
-        selection = null
-        playSeconds = 0L
-        touch()
-    }
-
     // ---------- derived ----------
 
     fun conflicts(): List<Conflict> {
@@ -297,14 +290,11 @@ class SuperViewModel(app: Application) : AndroidViewModel(app), BoardPlayground 
     /** Cells whose entry differs from the known solution (mistake mode WRONG). */
     fun wrongCells(): Set<Pos> {
         val sol = solution ?: return emptySet()
-        val out = HashSet<Pos>()
-        for (y in 0 until boardRows) for (x in 0 until boardCols) {
-            val v = board.get(x, y)
-            if (v != 0 && !board.isGiven(x, y) && sol[Pos(x, y)] != v) {
-                out.add(Pos(x, y))
-            }
-        }
-        return out
+        // A missing solution entry counts as a mismatch, as before.
+        return mismatchedCells(
+            boardCols, boardRows, board::get, board::isGiven,
+            solutionAt = { x, y -> sol[Pos(x, y)] },
+        )
     }
 
     fun hasSolution() = solution != null
@@ -327,26 +317,7 @@ class SuperViewModel(app: Application) : AndroidViewModel(app), BoardPlayground 
                 if (board.isGiven(x, y)) givenCount[v]++ else userCount[v]++
             }
         }
-        return IntArray(10) { d -> if (d == 0) 0 else 9 - givenCount[d] - userCount[d] }
-    }
-
-    /**
-     * User-only progress over the union of grid cells (overlaps counted once).
-     * Returns Triple(userFilled, fillable, doneGrids). Givens are excluded.
-     */
-    fun userProgress(): Triple<Int, Int, Int> {
-        val p = _puzzle.value ?: return Triple(0, 0, 0)
-        val cells = p.grids.flatMap { it.cells() }.toSet()
-        var fillable = 0
-        var filled = 0
-        for (c in cells) {
-            if (!board.inBounds(c.x, c.y)) continue
-            if (board.isGiven(c.x, c.y)) continue
-            fillable++
-            if (board.get(c) != 0) filled++
-        }
-        val done = p.grids.count { isGridComplete(it, board::get) }
-        return Triple(filled, fillable, done)
+        return remainingFromCounts(givenCount, userCount)
     }
 
     /** Cells to flag red under the current mistake mode (WRONG falls back to conflicts). */

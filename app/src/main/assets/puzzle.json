@@ -3050,52 +3050,52 @@
   {
    "text": "Classic",
    "x": 10,
-   "y": 2
+   "y": 0
   },
   {
    "text": "Futoshiki",
-   "x": 4,
-   "y": 7
+   "x": 0,
+   "y": 10
   },
   {
    "text": "Addition",
-   "x": 28,
-   "y": 7
+   "x": 32,
+   "y": 10
   },
   {
    "text": "Killer",
-   "x": 1,
-   "y": 10
+   "x": 0,
+   "y": 9
   },
   {
    "text": "White",
-   "x": 30,
-   "y": 10
+   "x": 32,
+   "y": 9
   },
   {
    "text": "Kropki",
-   "x": 30,
+   "x": 32,
    "y": 11
   },
   {
    "text": "Sudoku",
-   "x": 4,
-   "y": 24
+   "x": 0,
+   "y": 22
   },
   {
    "text": "X",
-   "x": 4,
-   "y": 25
+   "x": 0,
+   "y": 23
   },
   {
    "text": "Irregular",
-   "x": 28,
-   "y": 24
+   "x": 32,
+   "y": 22
   },
   {
    "text": "Disjoint",
-   "x": 10,
-   "y": 31
+   "x": 9,
+   "y": 32
   },
   {
    "text": "Sets",

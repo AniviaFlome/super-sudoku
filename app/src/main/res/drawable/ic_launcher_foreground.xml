@@ -4,10 +4,16 @@
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <!-- 3x3 sudoku-box glyph -->
+    <!-- 3x3 sudoku-box glyph, scaled down slightly (0.85 about center) -->
+    <group
+        android:scaleX="0.85"
+        android:scaleY="0.85"
+        android:pivotX="54"
+        android:pivotY="54">
     <path
         android:fillColor="#E8EAED"
         android:pathData="M30,30h12v12h-12zM48,30h12v12h-12zM66,30h12v12h-12zM30,48h12v12h-12zM48,48h12v12h-12zM66,48h12v12h-12zM30,66h12v12h-12zM48,66h12v12h-12zM66,66h12v12h-12z"
         android:strokeWidth="4"
         android:strokeColor="#E8EAED" />
+    </group>
 </vector>

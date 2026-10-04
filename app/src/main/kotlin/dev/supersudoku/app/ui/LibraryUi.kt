@@ -27,6 +27,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import dev.supersudoku.core.MapDifficulty
 
@@ -87,10 +88,12 @@ fun GameRow(
     onDelete: (() -> Unit)? = null,
     restartLabel: String? = null,
     onRestart: (() -> Unit)? = null,
+    testTag: String? = null,
 ) {
     var confirmDel by remember(title) { mutableStateOf(false) }
     Row(
         Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))
+            .then(if (testTag != null) Modifier.testTag(testTag) else Modifier)
             .clickable(onClick = onPlay).padding(12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {

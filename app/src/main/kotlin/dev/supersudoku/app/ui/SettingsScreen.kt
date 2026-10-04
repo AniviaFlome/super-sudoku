@@ -35,6 +35,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
+import dev.supersudoku.app.BuildConfig
 import dev.supersudoku.app.state.MistakeMode
 import dev.supersudoku.app.state.SettingsRepo
 import dev.supersudoku.app.state.AppTheme
@@ -54,6 +55,7 @@ fun SettingsScreen(settings: SettingsRepo, themes: ThemeRepo, onBack: () -> Unit
     val peerClear by settings.autoClearPeerNotes.collectAsState(initial = true)
     val dimDone by settings.dimCompletedDigits.collectAsState(initial = true)
     val orientation by settings.orientation.collectAsState(initial = SettingsRepo.Orientation.PORTRAIT)
+    val buttonsLeft by settings.keypadButtonsLeft.collectAsState(initial = false)
     val appTheme by themes.theme.collectAsState(initial = AppTheme.MOCHA)
     val accent by themes.accent.collectAsState(initial = CatppuccinAccent.MAUVE)
 
@@ -107,6 +109,12 @@ fun SettingsScreen(settings: SettingsRepo, themes: ThemeRepo, onBack: () -> Unit
                 optionSubtitle = ::orientationBlurb,
                 isSelected = { it == orientation },
                 onSelect = { scope.launch { settings.setOrientation(it) } },
+            )
+            SettingSwitch(
+                title = "Keypad buttons on left",
+                subtitle = "Mode and tool buttons left, digits right. Off keeps digits left.",
+                checked = buttonsLeft,
+                onChange = { scope.launch { settings.setKeypadButtonsLeft(it) } },
             )
             Spacer(Modifier.height(8.dp))
             SettingHeader("Board")
@@ -162,8 +170,7 @@ fun SettingsScreen(settings: SettingsRepo, themes: ThemeRepo, onBack: () -> Unit
             }
             Spacer(Modifier.height(8.dp))
             Text(
-                // Keep in sync with app/build.gradle.kts versionName.
-                "v1.0.3",
+                "v${BuildConfig.VERSION_NAME}",
                 style = MaterialTheme.typography.bodySmall,
                 color = BoardColors.dim,
             )

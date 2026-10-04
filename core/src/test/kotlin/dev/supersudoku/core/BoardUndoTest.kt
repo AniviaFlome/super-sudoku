@@ -38,15 +38,18 @@ class BoardUndoTest {
     }
 
     @Test
-    fun enterDigitClearsOwnNoteAndEraseClearsAll() {
+    fun enterDigitPreservesMarksAndEraseRevealsThem() {
         val b = PlayBoard(9, 9)
         b.toggleNote(4, 4, 2)
         b.toggleNote(4, 4, 5)
+        // Entering a digit hides the cell's own marks behind the value
+        // but keeps them, so erasing brings them back.
         b.enterDigit(4, 4, 2)
-        assertFalse(b.hasNote(4, 4, 2))
+        assertTrue(b.hasNote(4, 4, 2))
         assertTrue(b.hasNote(4, 4, 5))
         b.enterDigit(4, 4, 0)
-        assertEquals(0, b.noteMask(4, 4))
+        assertTrue(b.hasNote(4, 4, 2))
+        assertTrue(b.hasNote(4, 4, 5))
     }
 
     @Test

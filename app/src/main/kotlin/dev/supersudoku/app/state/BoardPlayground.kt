@@ -136,6 +136,24 @@ interface BoardPlayground {
         }
     }
 
+    /** Center marks toggle (turning on drops corner mode). */
+    fun toggleCenterMarks() {
+        if (notesMode) notesMode = false
+        else {
+            notesMode = true
+            cornerMode = false
+        }
+    }
+
+    /** Corner marks toggle (turning on drops center mode). */
+    fun toggleCornerMarks() {
+        if (cornerMode) cornerMode = false
+        else {
+            cornerMode = true
+            notesMode = false
+        }
+    }
+
     /** Route a board-cell tap. Returns true if a popup should open. */
     fun tapCell(p: Pos?, mode: TapMode, bidirectional: Boolean = true, clearPeers: Boolean = true): Boolean {
         if (p == null || !board.inBounds(p.x, p.y)) {
@@ -196,9 +214,12 @@ interface BoardPlayground {
     }
 }
 
+/** Shared tail: remaining placements per digit from counted givens + user entries. */
+internal fun remainingFromCounts(givenCount: IntArray, userCount: IntArray): IntArray =
+    IntArray(10) { d -> if (d == 0) 0 else 9 - givenCount[d] - userCount[d] }
+
 /** Cycle order for the in-pad input-mode switcher. */
-fun nextTapMode(m: TapMode): TapMode = when (m) {
-    TapMode.SELECT -> TapMode.INSERT
+fun nextTapMode(m: TapMode): TapMode = when (m) {    TapMode.SELECT -> TapMode.INSERT
     TapMode.INSERT -> TapMode.POPUP
     TapMode.POPUP -> TapMode.SELECT
 }

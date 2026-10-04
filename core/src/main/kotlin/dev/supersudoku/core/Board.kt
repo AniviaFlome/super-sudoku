@@ -73,22 +73,13 @@ class UndoStack(private val board: PlayBoard, private val cap: Int = 500) {
     }
 }
 
-/** Apply a digit (or erase with 0) to a non-given cell. Clears own pencil marks. */
+/** Apply a digit (or erase with 0) to a non-given cell. */
 fun PlayBoard.enterDigit(x: Int, y: Int, d: Int): Boolean {
     if (!inBounds(x, y) || isGiven(x, y)) return false
     value[idx(x, y)] = d
-    if (d != 0) {
-        // entering a digit clears its own pencil marks (center + corner)
-        notes[idx(x, y)] = notes[idx(x, y)] and (1 shl d).inv()
-        corner[idx(x, y)] = corner[idx(x, y)] and (1 shl d).inv()
-        if (value[idx(x, y)] == 0) {
-            notes[idx(x, y)] = 0
-            corner[idx(x, y)] = 0
-        }
-    } else {
-        notes[idx(x, y)] = 0
-        corner[idx(x, y)] = 0
-    }
+    // The value draws over the cell's pencil marks, but the marks are kept:
+    // erasing the digit reveals them again, OpenSudoku-style. Peer cleanup
+    // (when enabled) is the caller's job, not this cell's.
     return true
 }
 

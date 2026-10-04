@@ -114,14 +114,6 @@ object VariantGames {
             ?: emptyList()
     }
 
-    suspend fun count(context: Context, gridId: String): Int = withContext(Dispatchers.IO) {
-        dir(context).listFiles { f -> f.name.endsWith(".json") }
-            ?.count { f ->
-                runCatching { json.decodeFromString<GameFile>(f.readText()).gridId == gridId }
-                    .getOrDefault(false)
-            } ?: 0
-    }
-
     /**
      * Generate + persist a fresh game for a variant (slow: call off the main
      * thread). Returns null when no valid game comes out.
@@ -193,8 +185,8 @@ object VariantGames {
             return@withContext null
         }
         val givens81 = IntArray(81) { i -> givens[Pos(i % 9, i / 9)] ?: 0 }
-        val id = "v${System.currentTimeMillis()}"
         val now = System.currentTimeMillis()
+        val id = "v${now}x${kotlin.random.Random(now).nextInt(0, 1_000_000)}"
         withContext(Dispatchers.IO) {
             file(context, id).writeText(
                 json.encodeToString(

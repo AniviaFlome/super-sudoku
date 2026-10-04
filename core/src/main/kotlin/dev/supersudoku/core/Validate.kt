@@ -157,3 +157,30 @@ fun isGridComplete(grid: GridDef, get: (Pos) -> Int): Boolean {
     }
     return validateGrid(grid, get).isEmpty()
 }
+
+/**
+ * Cells whose user entry differs from the known solution (mistake mode WRONG).
+ *
+ * Givens and empty cells are never flagged. [solutionAt] returns the solved
+ * digit or null when unknown; unknown cells are flagged only when
+ * [flagUnknownSolution] is true. Single source of truth for every view-model's
+ * `wrongCells()` (super ring, standalone variants, classic practice).
+ */
+fun mismatchedCells(
+    cols: Int,
+    rows: Int,
+    get: (Int, Int) -> Int,
+    isGiven: (Int, Int) -> Boolean,
+    solutionAt: (Int, Int) -> Int?,
+    flagUnknownSolution: Boolean = true,
+): Set<Pos> {
+    val out = HashSet<Pos>()
+    for (y in 0 until rows) for (x in 0 until cols) {
+        val v = get(x, y)
+        if (v != 0 && !isGiven(x, y)) {
+            val s = solutionAt(x, y)
+            if ((s != null || flagUnknownSolution) && s != v) out.add(Pos(x, y))
+        }
+    }
+    return out
+}

@@ -2,7 +2,6 @@ package dev.supersudoku.app.state
 
 import android.content.Context
 import dev.supersudoku.core.ClassicGenerator
-import dev.supersudoku.core.ClassicSolver
 import dev.supersudoku.core.Difficulty
 import dev.supersudoku.core.GridDef
 import dev.supersudoku.core.Variant
@@ -90,7 +89,8 @@ object PracticeStore {
             File(context.filesDir, "practice_save.json").delete()
             return@withContext
         }
-        val id = "p${System.currentTimeMillis()}"
+        val legacyNow = System.currentTimeMillis()
+        val id = "p${legacyNow}x${kotlin.random.Random(legacyNow).nextInt(0, 1_000_000)}"
         file(context, id).writeText(
             json.encodeToString(
                 EntryFile(
@@ -118,7 +118,8 @@ object PracticeStore {
     suspend fun create(context: Context, difficulty: Difficulty): Loaded =
         withContext(Dispatchers.Default) {
             val puzzle = ClassicGenerator.generate(difficulty, Random(System.currentTimeMillis()))
-            val id = "p${System.currentTimeMillis()}"
+            val createdNow = System.currentTimeMillis()
+            val id = "p${createdNow}x${kotlin.random.Random(createdNow).nextInt(0, 1_000_000)}"
             file(context, id).writeText(
                 json.encodeToString(
                     EntryFile(
@@ -172,8 +173,4 @@ object PracticeStore {
     suspend fun delete(context: Context, id: String) = withContext(Dispatchers.IO) {
         file(context, id).delete()
     }
-
-    /** True when the stored puzzle is uniquely solvable (sanity for imports). */
-    fun isUniquelySolvable(puzzle: IntArray): Boolean =
-        ClassicSolver.countSolutions(puzzle.copyOf(), 2) == 1
 }

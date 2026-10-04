@@ -12,7 +12,8 @@ import java.io.File
 fun main(args: Array<String>) {
     val negativeKropki = args.contains("negativeKropki")
     val onlyGrid = args.firstOrNull { it.startsWith("grid=") }?.substringAfter("=")
-    val puzzleFile = File("../app/src/main/assets/puzzle.json")
+    val root = findRepoRoot()
+    val puzzleFile = File(root, "app/src/main/assets/puzzle.json")
     require(puzzleFile.exists()) { "missing ${puzzleFile.absolutePath}" }
     val puzzle = PuzzleLoader.load(puzzleFile.readText())
     val grids = if (onlyGrid != null) puzzle.grids.filter { it.id == onlyGrid } else puzzle.grids
@@ -67,6 +68,15 @@ fun main(args: Array<String>) {
         }
         append("]}")
     }
-    File("../app/src/main/assets/solution.json").writeText(out)
+    File(root, "app/src/main/assets/solution.json").writeText(out)
     println("UNIQUE wrote solution.json (${sol.size} cells)")
+}
+
+/** Walk up from the JVM working dir to the repo root (has settings.gradle.kts). */
+private fun findRepoRoot(): File {
+    var dir = File(System.getProperty("user.dir")).canonicalFile
+    while (true) {
+        if (File(dir, "settings.gradle.kts").exists()) return dir
+        dir = dir.parentFile ?: throw IllegalStateException("repo root not found above ${System.getProperty("user.dir")}")
+    }
 }

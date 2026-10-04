@@ -1,8 +1,8 @@
-// Root build file: shared versions live here.
+// Root build file: all shared versions live in gradle/libs.versions.toml.
 plugins {
-    id("com.android.application") version "8.5.2" apply false
-    id("org.jetbrains.kotlin.android") version "2.0.21" apply false
-    id("org.jetbrains.kotlin.plugin.compose") version "2.0.21" apply false
-    kotlin("jvm") version "2.0.21" apply false
-    kotlin("plugin.serialization") version "2.0.21" apply false
+    alias(libs.plugins.agp) apply false
+    alias(libs.plugins.kotlin.android) apply false
+    alias(libs.plugins.kotlin.compose) apply false
+    alias(libs.plugins.kotlin.jvm) apply false
+    alias(libs.plugins.kotlin.serialization) apply false
 }

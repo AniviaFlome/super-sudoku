@@ -14,14 +14,13 @@ import kotlin.random.Random
  * Usage: gradle :core:mintStandalone
  */
 fun main() {
-    val puzzleFile = File("../app/src/main/assets/puzzle.json")
-    val solutionFile = File("../app/src/main/assets/solution.json")
+    val root = findRepoRoot()
+    val puzzleFile = File(root, "app/src/main/assets/puzzle.json")
+    val solutionFile = File(root, "app/src/main/assets/solution.json")
     require(puzzleFile.exists()) { "missing ${puzzleFile.absolutePath}" }
     require(solutionFile.exists()) { "missing ${solutionFile.absolutePath}" }
     val puzzle = PuzzleLoader.load(puzzleFile.readText())
     val solution = PuzzleLoader.loadSolution(solutionFile.readText())
-    val merged = HashMap<Pos, Int>()
-    for (g in puzzle.grids) for ((p, v) in g.givens) merged[p] = v
 
     // Grids already unique standalone keep template givens; else dig target.
     val digTargets = mapOf(
@@ -35,7 +34,9 @@ fun main() {
     val out = StringBuilder()
     out.append("{\"grids\":[")
     puzzle.grids.forEachIndexed { gi, g ->
-        val inBounds = merged.filterKeys { (x, y) -> x in g.x until g.x + 9 && y in g.y until g.y + 9 }
+        // Only this grid's own givens: neighbor grids' givens on shared
+        // overlap cells must not leak into the standalone puzzle.
+        val inBounds = g.givens.filterKeys { (x, y) -> x in g.x until g.x + 9 && y in g.y until g.y + 9 }
         val solo = g.copy(givens = inBounds)
         val baseCount = SuperGenerator.countSolutions(listOf(solo), inBounds, 2)
         val finalGivens: Map<Pos, Int>
@@ -68,6 +69,15 @@ fun main() {
         out.append("]}")
     }
     out.append("]}")
-    File("../app/src/main/assets/standalone.json").writeText(out.toString())
+    File(root, "app/src/main/assets/standalone.json").writeText(out.toString())
     println("wrote standalone.json")
+}
+
+/** Walk up from the JVM working dir to the repo root (has settings.gradle.kts). */
+private fun findRepoRoot(): File {
+    var dir = File(System.getProperty("user.dir")).canonicalFile
+    while (true) {
+        if (File(dir, "settings.gradle.kts").exists()) return dir
+        dir = dir.parentFile ?: throw IllegalStateException("repo root not found above ${System.getProperty("user.dir")}")
+    }
 }
