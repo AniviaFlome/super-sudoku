@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.1.1 — 2026-10-04
+
+- Fixed generated Easy/Medium games duplicating the Original: Futoshiki/Kropki Medium reused the template givens verbatim (now sprinkles distinct extra cells per grade), and super maps plus Hard variant digs retry for minimum novelty instead of minting near-duplicates (too-weak results now show the retry error).
+
 ## 1.1.0 — 2026-10-05
 
 - Pencil marks are now preserved when entering or erasing a digit (erase reveals the marks again).
