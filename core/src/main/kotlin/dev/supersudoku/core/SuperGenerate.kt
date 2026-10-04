@@ -3,10 +3,20 @@ package dev.supersudoku.core
 import kotlin.random.Random
 
 /** Map generation difficulty: how many givens to dig away (from ~125). */
-enum class MapDifficulty(val maxRemove: Int, val timeBudgetMs: Long, val label: String) {
-    EASY(12, 15_000, "Easy"),
-    MEDIUM(28, 30_000, "Medium"),
-    HARD(48, 60_000, "Hard"),
+enum class MapDifficulty(
+    val maxRemove: Int,
+    /**
+     * Minimum accepted removals: below this the result is a near-duplicate
+     * of the template, so callers must retry with a fresh seed or fail
+     * loudly instead of minting it.
+     */
+    val minRemove: Int,
+    val timeBudgetMs: Long,
+    val label: String,
+) {
+    EASY(12, 6, 15_000, "Easy"),
+    MEDIUM(28, 14, 30_000, "Medium"),
+    HARD(48, 24, 60_000, "Hard"),
 }
 
 /**
@@ -96,6 +106,36 @@ object SuperGenerator {
             }
         }
         return GeneratedMap(givens.toMap(), removed, timedOut)
+    }
+
+    /**
+     * Sprinkle extra solution cells onto an already uniquely-solvable given
+     * set. A superset of unique givens stays unique by construction (fewer
+     * completions can only eliminate the alternative solutions, and the
+     * known solution still satisfies everything), so no solver call is
+     * needed here — callers still re-verify with [countSolutions] as a gate.
+     * Used for easier-than-template games (e.g. Easy/Medium standalone
+     * variants that keep their template givens).
+     */
+    fun sprinkleExtras(
+        templateGivens: Map<Pos, Int>,
+        solution: Map<Pos, Int>,
+        extraCount: Int,
+        random: Random = Random.Default,
+    ): Map<Pos, Int> {
+        if (extraCount <= 0) return HashMap(templateGivens)
+        val out = HashMap(templateGivens)
+        var added = 0
+        for (p in solution.keys.shuffled(random)) {
+            if (added >= extraCount) break
+            if (p in out) continue
+            // Skip cells with no known solution value (corrupt input stays
+            // a generation failure, never a crash: callers gate on novelty
+            // and uniqueness and return null).
+            out[p] = solution[p] ?: continue
+            added++
+        }
+        return out
     }
 
     /**

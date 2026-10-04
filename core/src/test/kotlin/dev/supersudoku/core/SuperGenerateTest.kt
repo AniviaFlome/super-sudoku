@@ -43,4 +43,93 @@ class SuperGenerateTest {
         // Still exactly one solution.
         assertEquals(1, SuperGenerator.countSolutions(puzzle.grids, out.givens, 2))
     }
+
+    @Test
+    fun difficultyMinimumsAreReachableNoveltyFloors() {
+        for (d in MapDifficulty.entries) {
+            assertTrue(d.minRemove > 0, "${d.name}: minRemove must reject duplicates")
+            assertTrue(d.minRemove <= d.maxRemove, "${d.name}: min above max")
+        }
+    }
+
+    @Test
+    fun easyAndMediumHitCapsWithNovelUniqueOutput() {
+        val puzzle = PuzzleLoader.load(asset("puzzle.json"))
+        val solution = PuzzleLoader.loadSolution(asset("solution.json"))
+        val base = HashMap<Pos, Int>()
+        for (g in puzzle.grids) for ((p, v) in g.givens) base[p] = v
+        val easy = SuperGenerator.generate(
+            template = puzzle, solution = solution, random = Random(1),
+            maxRemove = MapDifficulty.EASY.maxRemove,
+            timeBudgetMs = MapDifficulty.EASY.timeBudgetMs,
+        )
+        val medium = SuperGenerator.generate(
+            template = puzzle, solution = solution, random = Random(2),
+            maxRemove = MapDifficulty.MEDIUM.maxRemove,
+            timeBudgetMs = MapDifficulty.MEDIUM.timeBudgetMs,
+        )
+        assertEquals(MapDifficulty.EASY.maxRemove, easy.removedCount)
+        assertEquals(MapDifficulty.MEDIUM.maxRemove, medium.removedCount)
+        // Novel: strict subsets of the template, distinct from each other.
+        assertTrue(easy.givens.size == base.size - easy.removedCount)
+        assertTrue(medium.givens.size == base.size - medium.removedCount)
+        assertTrue(easy.givens != base, "easy map duplicates the Original")
+        assertTrue(medium.givens != base, "medium map duplicates the Original")
+        assertTrue(easy.givens != medium.givens, "easy and medium coincide")
+        assertEquals(1, SuperGenerator.countSolutions(puzzle.grids, easy.givens, 2))
+        assertEquals(1, SuperGenerator.countSolutions(puzzle.grids, medium.givens, 2))
+    }
+
+    /** Shift a grid's geometry to local 0..8 coordinates (mirrors StandaloneStore.localGrid). */
+    private fun localGrid(g: GridDef): GridDef {
+        fun shift(p: Pos) = Pos(p.x - g.x, p.y - g.y)
+        return g.copy(
+            x = 0, y = 0,
+            givens = g.givens.mapKeys { (p, _) -> shift(p) },
+            inequalities = g.inequalities.map { (a, b) -> shift(a) to shift(b) },
+            dots = g.dots.map { (a, b) -> shift(a) to shift(b) },
+            cages = g.cages.map { c -> Cage(c.cells.map(::shift).toSet(), c.total) },
+            equations = g.equations.map { e ->
+                Equation(e.operands.map { op -> op.map(::shift) }, e.total.map(::shift))
+            },
+            regions = g.regions.map { r -> r.map(::shift).toSet() },
+            groups = g.groups.map { r -> r.map(::shift).toSet() },
+        )
+    }
+
+    @Test
+    fun templateKeptVariantsSprinkleNovelUniqueExtras() {
+        val puzzle = PuzzleLoader.load(asset("puzzle.json"))
+        val solution = PuzzleLoader.loadSolution(asset("solution.json"))
+        val standalone = StandaloneLoader.load(asset("standalone.json"))
+        for (gridId in listOf("futoshiki", "kropki")) {
+            val g = puzzle.grids.first { it.id == gridId }
+            val templateLocal = standalone.getValue(gridId)
+                .mapKeys { (p, _) -> Pos(p.x - g.x, p.y - g.y) }
+            val solutionLocal = HashMap<Pos, Int>()
+            for (dy in 0 until 9) for (dx in 0 until 9) {
+                solutionLocal[Pos(dx, dy)] = solution.getValue(Pos(g.x + dx, g.y + dy))
+            }
+            val bare = localGrid(g).copy(givens = emptyMap())
+            val easy = SuperGenerator.sprinkleExtras(templateLocal, solutionLocal, 8, Random(11))
+            val medium = SuperGenerator.sprinkleExtras(templateLocal, solutionLocal, 4, Random(11))
+            // Novelty: strict supersets with distinct counts (never the Original).
+            assertEquals(templateLocal.size + 8, easy.size, "$gridId easy")
+            assertEquals(templateLocal.size + 4, medium.size, "$gridId medium")
+            assertTrue(easy != templateLocal && medium != templateLocal, "$gridId duplicates Original")
+            assertTrue(easy != medium, "$gridId easy and medium coincide")
+            for ((p, v) in easy) assertEquals(solutionLocal[p], v, "$gridId easy disagrees at $p")
+            assertEquals(1, SuperGenerator.countSolutions(listOf(bare), easy, 2), "$gridId easy")
+            assertEquals(1, SuperGenerator.countSolutions(listOf(bare), medium, 2), "$gridId medium")
+            // Hard digs a few away through the shared generator: novel + unique.
+            val pseudo = SuperPuzzle(listOf(bare.copy(givens = templateLocal)), emptyList())
+            val hard = SuperGenerator.generate(
+                template = pseudo, solution = solutionLocal, random = Random(13),
+                maxRemove = 4, timeBudgetMs = 30_000,
+            )
+            assertTrue(hard.removedCount in 1..4, "$gridId hard removed=${hard.removedCount}")
+            assertTrue(hard.givens != templateLocal, "$gridId hard duplicates Original")
+            assertEquals(1, SuperGenerator.countSolutions(listOf(bare), hard.givens, 2), "$gridId hard")
+        }
+    }
 }

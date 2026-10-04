@@ -4,6 +4,7 @@ import android.content.Context
 import dev.supersudoku.core.MapDifficulty
 import dev.supersudoku.core.Pos
 import dev.supersudoku.core.SuperGenerator
+import dev.supersudoku.core.SuperPuzzle
 import dev.supersudoku.core.isGridComplete
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -116,12 +117,13 @@ object VariantGames {
 
     /**
      * Generate + persist a fresh game for a variant (slow: call off the main
-     * thread). Returns null when no valid game comes out.
+     * thread). Returns null when no valid novel game comes out.
      *
-     * Futoshiki and Kropki keep template givens (already unique): Easy adds
-     * extra solution cells (uniqueness is preserved by construction, no
-     * solver needed), Medium reuses the template set, Hard digs a few away.
-     * All other variants dig down from the full solution to the target.
+     * Futoshiki and Kropki keep template givens (already unique): Easy and
+     * Medium sprinkle extra solution cells on top (a superset of unique
+     * givens stays unique, with distinct counts so the grades and the
+     * Original never coincide), Hard digs a few away. All other variants
+     * dig down from the full solution to the target.
      */
     suspend fun create(
         context: Context,
@@ -142,32 +144,36 @@ object VariantGames {
             val v = template.givens[i]
             if (v != 0) templateLocal[Pos(i % 9, i / 9)] = v
         }
+        val seedBase = System.currentTimeMillis()
         val givens: Map<Pos, Int> = if (gridId == "futoshiki" || gridId == "kropki") {
             when (difficulty) {
-                MapDifficulty.EASY -> {
-                    // Superset of unique givens stays unique: sprinkle extras.
-                    val extra = solutionMap.keys
-                        .filter { it !in templateLocal }
-                        .shuffled(Random(System.currentTimeMillis()))
-                        .take(8)
-                    HashMap(templateLocal).also { m ->
-                        for (p in extra) m[p] = solutionMap.getValue(p)
-                    }
-                }
-                MapDifficulty.MEDIUM -> HashMap(templateLocal)
+                MapDifficulty.EASY ->
+                    SuperGenerator.sprinkleExtras(templateLocal, solutionMap, 8, Random(seedBase))
+                MapDifficulty.MEDIUM ->
+                    SuperGenerator.sprinkleExtras(templateLocal, solutionMap, 4, Random(seedBase))
                 MapDifficulty.HARD -> {
-                    val order = templateLocal.keys.shuffled(Random(System.currentTimeMillis()))
-                    val dug = HashMap(templateLocal)
-                    val deadline = System.currentTimeMillis() + difficulty.timeBudgetMs
-                    for (p in order) {
-                        if (dug.size <= templateLocal.size - 4) break
-                        if (System.currentTimeMillis() > deadline) break
-                        val v = dug.remove(p) ?: continue
-                        if (SuperGenerator.countSolutions(listOf(bare), dug, 2) != 1) {
-                            dug[p] = v
-                        }
+                    // Dig a few away through the shared generator (same
+                    // per-grid floors as bespoke digging had); yield is
+                    // order-dependent, so keep the best of up to 3 attempts.
+                    val pseudo = SuperPuzzle(
+                        grids = listOf(bare.copy(givens = templateLocal)),
+                        labels = emptyList(),
+                    )
+                    fun dig(seed: Long) = SuperGenerator.generate(
+                        template = pseudo,
+                        solution = solutionMap,
+                        random = Random(seed),
+                        maxRemove = 4,
+                        timeBudgetMs = difficulty.timeBudgetMs,
+                    )
+                    var best = dig(seedBase)
+                    var attempt = 1
+                    while (attempt < 3 && best.removedCount < 1) {
+                        attempt++
+                        val alt = dig(seedBase + attempt)
+                        if (alt.removedCount > best.removedCount) best = alt
                     }
-                    dug
+                    best.givens
                 }
             }
         } else {
@@ -180,6 +186,10 @@ object VariantGames {
                 timeBudgetMs = difficulty.timeBudgetMs,
             )
             dug.givens
+        }
+        // Never persist a duplicate of the Original (failed dig / no room).
+        if (givens == templateLocal) {
+            return@withContext null
         }
         if (SuperGenerator.countSolutions(listOf(bare), givens, 2) != 1) {
             return@withContext null

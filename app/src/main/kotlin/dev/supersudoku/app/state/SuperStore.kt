@@ -231,8 +231,10 @@ object SuperStore {
 
     /**
      * Mint a fresh map out of the bundled template (slow: call off the main
-     * thread). Returns null when digging removed nothing (caller should offer
-     * Restart instead of a duplicate map).
+     * thread). Returns null when digging fails to reach the difficulty's
+     * minimum novelty (caller should offer Restart instead of a duplicate
+     * map). Removal yield is shuffle-order dependent and slow devices may
+     * time out early, so the best of up to 3 attempts is kept.
      */
     suspend fun createMap(
         context: Context,
@@ -245,14 +247,22 @@ object SuperStore {
                 context.assets.open("solution.json").bufferedReader().use { it.readText() }
             )
         }.getOrNull() ?: return@withContext null
-        val out = dev.supersudoku.core.SuperGenerator.generate(
+        val seedBase = System.currentTimeMillis()
+        fun dig(seed: Long) = dev.supersudoku.core.SuperGenerator.generate(
             template = template,
             solution = sol,
-            random = kotlin.random.Random(System.currentTimeMillis()),
+            random = kotlin.random.Random(seed),
             maxRemove = difficulty.maxRemove,
             timeBudgetMs = difficulty.timeBudgetMs,
         )
-        if (out.removedCount == 0) return@withContext null
+        var out = dig(seedBase)
+        var attempt = 1
+        while (attempt < 3 && out.removedCount < difficulty.minRemove) {
+            attempt++
+            val alt = dig(seedBase + attempt)
+            if (alt.removedCount > out.removedCount) out = alt
+        }
+        if (out.removedCount < difficulty.minRemove) return@withContext null
         val now = System.currentTimeMillis()
         // Random suffix: two taps in the same millisecond must not share an id.
         // Stable display number: max(existing) + 1, so deleting a map never
