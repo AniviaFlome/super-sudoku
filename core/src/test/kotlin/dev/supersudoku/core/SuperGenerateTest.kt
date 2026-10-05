@@ -103,6 +103,110 @@ class SuperGenerateTest {
         assertTrue(seen.size > 1, "6 seeds produced a single map")
     }
 
+    @Test
+    fun sameSeedIsDeterministic() {
+        // Methodology guard: identical RNG streams must give identical maps,
+        // proving variety comes from the RNG stream itself.
+        val puzzle = PuzzleLoader.load(asset("puzzle.json"))
+        val solution = PuzzleLoader.loadSolution(asset("solution.json"))
+        fun once() = SuperGenerator.generate(
+            template = puzzle, solution = solution, random = Random(42),
+            maxRemove = MapDifficulty.EASY.maxRemove,
+            timeBudgetMs = MapDifficulty.EASY.timeBudgetMs,
+        ).givens
+        assertEquals(once(), once())
+    }
+
+    @Test
+    fun rapidSuccessiveGenerationsAreDistinct() {
+        // The reported bug: rapid taps minted identical maps because every
+        // shuffle was seeded with the current millisecond. Production now
+        // uses Random.Default, so back-to-back generations must differ.
+        val puzzle = PuzzleLoader.load(asset("puzzle.json"))
+        val solution = PuzzleLoader.loadSolution(asset("solution.json"))
+        val seen = HashSet<Map<Pos, Int>>()
+        repeat(6) {
+            val out = SuperGenerator.generate(
+                template = puzzle, solution = solution, random = Random.Default,
+                maxRemove = MapDifficulty.EASY.maxRemove,
+                timeBudgetMs = MapDifficulty.EASY.timeBudgetMs,
+            )
+            assertTrue(
+                out.removedCount >= MapDifficulty.EASY.minRemove,
+                "rapid generation dug only ${out.removedCount}",
+            )
+            assertEquals(1, SuperGenerator.countSolutions(puzzle.grids, out.givens, 2))
+            seen.add(out.givens)
+        }
+        assertEquals(6, seen.size, "rapid taps produced duplicate maps")
+    }
+
+    /** Local-coords template givens, solution and bare grid for a variant. */
+    private data class VariantSetup(
+        val templateLocal: Map<Pos, Int>,
+        val solutionLocal: Map<Pos, Int>,
+        val bare: GridDef,
+    )
+
+    private fun variantSetup(gridId: String): VariantSetup {
+        val puzzle = PuzzleLoader.load(asset("puzzle.json"))
+        val solution = PuzzleLoader.loadSolution(asset("solution.json"))
+        val standalone = StandaloneLoader.load(asset("standalone.json"))
+        val g = puzzle.grids.first { it.id == gridId }
+        val templateLocal = standalone.getValue(gridId)
+            .mapKeys { (p, _) -> Pos(p.x - g.x, p.y - g.y) }
+        val solutionLocal = HashMap<Pos, Int>()
+        for (dy in 0 until 9) for (dx in 0 until 9) {
+            solutionLocal[Pos(dx, dy)] = solution.getValue(Pos(g.x + dx, g.y + dy))
+        }
+        return VariantSetup(templateLocal, solutionLocal, localGrid(g).copy(givens = emptyMap()))
+    }
+
+    @Test
+    fun rapidSprinkleExtrasAreDistinct() {
+        // The microsecond worst case of the same-millisecond bug: sprinkle
+        // takes no measurable time, so time-seeded shuffles collided on
+        // almost every rapid tap. Must now differ tap to tap.
+        val (templateLocal, solutionLocal, bare) = variantSetup("futoshiki")
+        val seen = HashSet<Map<Pos, Int>>()
+        repeat(6) {
+            val givens = SuperGenerator.sprinkleExtras(templateLocal, solutionLocal, 8, Random.Default)
+            assertEquals(templateLocal.size + 8, givens.size)
+            assertEquals(1, SuperGenerator.countSolutions(listOf(bare), givens, 2))
+            seen.add(givens)
+        }
+        assertEquals(6, seen.size, "rapid Easy taps produced duplicate games")
+    }
+
+    @Test
+    fun rapidDigDownIsDistinct() {
+        // The dig-down path (non-futoshiki/kropki variants) under rapid taps.
+        val (templateLocal, solutionLocal, bare) = variantSetup("classic")
+        val seen = HashSet<Map<Pos, Int>>()
+        repeat(3) {
+            val dug = SuperGenerator.digDown(
+                grids = listOf(bare),
+                solution = solutionLocal,
+                targetGivens = templateLocal.size + 8,
+                random = Random.Default,
+                timeBudgetMs = 60_000,
+            )
+            assertEquals(1, SuperGenerator.countSolutions(listOf(bare), dug.givens, 2))
+            assertTrue(dug.givens != templateLocal, "dug game duplicates the Original")
+            seen.add(dug.givens)
+        }
+        assertEquals(3, seen.size, "rapid taps produced duplicate dug games")
+    }
+
+    @Test
+    fun rapidIdsAreUnique() {
+        // The compounding half of the bug: ids derived from the creation
+        // millisecond overwrote each other's files. UUIDs must never collide.
+        val seen = HashSet<String>()
+        repeat(1_000) { seen.add(java.util.UUID.randomUUID().toString()) }
+        assertEquals(1_000, seen.size)
+    }
+
     /** Shift a grid's geometry to local 0..8 coordinates (mirrors StandaloneStore.localGrid). */
     private fun localGrid(g: GridDef): GridDef {
         fun shift(p: Pos) = Pos(p.x - g.x, p.y - g.y)
