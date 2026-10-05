@@ -13,6 +13,7 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import java.io.File
+import java.util.UUID
 
 /**
  * Super puzzle library (OpenSudoku-style level browser backing store).
@@ -247,27 +248,29 @@ object SuperStore {
                 context.assets.open("solution.json").bufferedReader().use { it.readText() }
             )
         }.getOrNull() ?: return@withContext null
-        val seedBase = System.currentTimeMillis()
-        fun dig(seed: Long) = dev.supersudoku.core.SuperGenerator.generate(
+        // Attempts draw from the shared non-deterministic RNG: seeding from
+        // the clock made same-millisecond taps mint byte-identical maps.
+        fun dig() = dev.supersudoku.core.SuperGenerator.generate(
             template = template,
             solution = sol,
-            random = kotlin.random.Random(seed),
+            random = kotlin.random.Random.Default,
             maxRemove = difficulty.maxRemove,
             timeBudgetMs = difficulty.timeBudgetMs,
         )
-        var out = dig(seedBase)
+        var out = dig()
         var attempt = 1
         while (attempt < 3 && out.removedCount < difficulty.minRemove) {
             attempt++
-            val alt = dig(seedBase + attempt)
+            val alt = dig()
             if (alt.removedCount > out.removedCount) out = alt
         }
         if (out.removedCount < difficulty.minRemove) return@withContext null
         val now = System.currentTimeMillis()
-        // Random suffix: two taps in the same millisecond must not share an id.
+        // UUIDs, not clock-derived ids: two taps in the same millisecond must
+        // never share a file (same-ms creations used to overwrite each other).
         // Stable display number: max(existing) + 1, so deleting a map never
         // reuses a visible "Map #n".
-        val id = "m${now}x${kotlin.random.Random(now).nextInt(0, 1_000_000)}"
+        val id = "m${UUID.randomUUID()}"
         val number = withContext(Dispatchers.IO) {
             val n = (
                 mapsDir(context).listFiles { f -> f.name.endsWith(".json") }

@@ -80,6 +80,29 @@ class SuperGenerateTest {
         assertEquals(1, SuperGenerator.countSolutions(puzzle.grids, medium.givens, 2))
     }
 
+    @Test
+    fun distinctSeedsYieldDistinctMaps() {
+        // Guards the same-millisecond duplicate bug: the shuffle order (not
+        // the seed source) must drive variety, so different seeds must give
+        // different maps.
+        val puzzle = PuzzleLoader.load(asset("puzzle.json"))
+        val solution = PuzzleLoader.loadSolution(asset("solution.json"))
+        val seen = HashSet<Map<Pos, Int>>()
+        for (seed in 1..6) {
+            val out = SuperGenerator.generate(
+                template = puzzle, solution = solution, random = Random(seed),
+                maxRemove = MapDifficulty.EASY.maxRemove,
+                timeBudgetMs = MapDifficulty.EASY.timeBudgetMs,
+            )
+            assertTrue(
+                out.removedCount >= MapDifficulty.EASY.minRemove,
+                "seed $seed dug only ${out.removedCount}",
+            )
+            seen.add(out.givens)
+        }
+        assertTrue(seen.size > 1, "6 seeds produced a single map")
+    }
+
     /** Shift a grid's geometry to local 0..8 coordinates (mirrors StandaloneStore.localGrid). */
     private fun localGrid(g: GridDef): GridDef {
         fun shift(p: Pos) = Pos(p.x - g.x, p.y - g.y)

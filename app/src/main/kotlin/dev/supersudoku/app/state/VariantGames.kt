@@ -12,6 +12,7 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import java.io.File
+import java.util.UUID
 import kotlin.random.Random
 
 /**
@@ -144,13 +145,14 @@ object VariantGames {
             val v = template.givens[i]
             if (v != 0) templateLocal[Pos(i % 9, i / 9)] = v
         }
-        val seedBase = System.currentTimeMillis()
+        // All draws use the shared non-deterministic RNG: clock seeds made
+        // same-millisecond taps mint byte-identical games.
         val givens: Map<Pos, Int> = if (gridId == "futoshiki" || gridId == "kropki") {
             when (difficulty) {
                 MapDifficulty.EASY ->
-                    SuperGenerator.sprinkleExtras(templateLocal, solutionMap, 8, Random(seedBase))
+                    SuperGenerator.sprinkleExtras(templateLocal, solutionMap, 8, Random.Default)
                 MapDifficulty.MEDIUM ->
-                    SuperGenerator.sprinkleExtras(templateLocal, solutionMap, 4, Random(seedBase))
+                    SuperGenerator.sprinkleExtras(templateLocal, solutionMap, 4, Random.Default)
                 MapDifficulty.HARD -> {
                     // Dig a few away through the shared generator (same
                     // per-grid floors as bespoke digging had); yield is
@@ -159,18 +161,18 @@ object VariantGames {
                         grids = listOf(bare.copy(givens = templateLocal)),
                         labels = emptyList(),
                     )
-                    fun dig(seed: Long) = SuperGenerator.generate(
+                    fun dig() = SuperGenerator.generate(
                         template = pseudo,
                         solution = solutionMap,
-                        random = Random(seed),
+                        random = Random.Default,
                         maxRemove = 4,
                         timeBudgetMs = difficulty.timeBudgetMs,
                     )
-                    var best = dig(seedBase)
+                    var best = dig()
                     var attempt = 1
                     while (attempt < 3 && best.removedCount < 1) {
                         attempt++
-                        val alt = dig(seedBase + attempt)
+                        val alt = dig()
                         if (alt.removedCount > best.removedCount) best = alt
                     }
                     best.givens
@@ -182,7 +184,7 @@ object VariantGames {
                 grids = listOf(bare),
                 solution = solutionMap,
                 targetGivens = target,
-                random = Random(System.currentTimeMillis()),
+                random = Random.Default,
                 timeBudgetMs = difficulty.timeBudgetMs,
             )
             dug.givens
@@ -196,7 +198,8 @@ object VariantGames {
         }
         val givens81 = IntArray(81) { i -> givens[Pos(i % 9, i / 9)] ?: 0 }
         val now = System.currentTimeMillis()
-        val id = "v${now}x${kotlin.random.Random(now).nextInt(0, 1_000_000)}"
+        // UUIDs, not clock-derived ids: same-ms creations overwrote each other.
+        val id = "v${UUID.randomUUID()}"
         withContext(Dispatchers.IO) {
             file(context, id).writeText(
                 json.encodeToString(

@@ -12,6 +12,7 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import java.io.File
+import java.util.UUID
 import kotlin.random.Random
 
 /**
@@ -117,9 +118,12 @@ object PracticeStore {
     /** Generate + persist a new puzzle (slow: call off the main thread). */
     suspend fun create(context: Context, difficulty: Difficulty): Loaded =
         withContext(Dispatchers.Default) {
-            val puzzle = ClassicGenerator.generate(difficulty, Random(System.currentTimeMillis()))
+            // Shared non-deterministic RNG: clock seeds made same-millisecond
+            // taps generate byte-identical puzzles.
+            val puzzle = ClassicGenerator.generate(difficulty, Random.Default)
             val createdNow = System.currentTimeMillis()
-            val id = "p${createdNow}x${kotlin.random.Random(createdNow).nextInt(0, 1_000_000)}"
+            // UUIDs, not clock-derived ids: same-ms creations overwrote each other.
+            val id = "p${UUID.randomUUID()}"
             file(context, id).writeText(
                 json.encodeToString(
                     EntryFile(
