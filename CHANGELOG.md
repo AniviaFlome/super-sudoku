@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.1.2 — 2026-10-05
+
+- Fixed generators producing only 2-3 distinct maps: generation shuffles were seeded with the current millisecond, so rapid taps produced identical puzzles (and identical file ids overwrote each other). Generation now uses unseeded randomness and unique ids, so every new map/game is distinct.
+
 ## 1.1.1 — 2026-10-04
 
 - Fixed generated Easy/Medium games duplicating the Original: Futoshiki/Kropki Medium reused the template givens verbatim (now sprinkles distinct extra cells per grade), and super maps plus Hard variant digs retry for minimum novelty instead of minting near-duplicates (too-weak results now show the retry error).
